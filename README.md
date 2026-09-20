@@ -1,110 +1,65 @@
-# AWS EC2 Master Hands-On Labs Curriculum
+# AWS Hands-On Engineering Labs 🚀
 
-Welcome to the **AWS EC2 Master Labs** repository. This curriculum is designed to give cloud architects, DevOps engineers, and system administrators a deep, production-grade understanding of **every aspect of Amazon Elastic Compute Cloud (EC2)**.
+Welcome to the **AWS Labs** repository — an enterprise-grade collection of production-ready, hands-on laboratories, step-by-step CLI execution guides, pre-rendered architectural diagrams, and deep-dive technical command explanations for Amazon Web Services (AWS).
+
+This repository is organized by AWS service domains, providing practical, real-world implementations designed for Cloud Architects, DevOps/Platform Engineers, Security Specialists, and System Administrators.
 
 ---
 
-## 🧭 Curriculum Map
+## 🧭 Service Laboratories Catalog
 
-![Architecture Diagram](./images/architecture-overview.png)
+| Service / Domain | Path | Labs Count | Key Focus Areas |
+| :--- | :--- | :---: | :--- |
+| 🖥️ **[Amazon EC2 (Elastic Compute Cloud)](./EC2)** | [`/EC2`](./EC2) | **28 Labs** (8 Modules) | Compute Architectures, Graviton ARM64, EBS Elastic Volumes, NVMe Instance Store, EFS, Dual-ENI Routing, ENA Express (SRD), IMDSv2 Hardening, SSM Session Manager, Launch Templates, ALB & Target Tracking ASG, Spot Fleets & Interruption Watchdogs, FinOps gp3 Modernization, Disaster Recovery (EBS Root Rescue & Serial Console), VPC Flow Logs, and AWS Nitro System & Enclaves. |
+| 🌐 **Amazon VPC & Hybrid Networking** | *(Roadmap)* | Planned | Transit Gateway, VPC Peering, PrivateLink, Route 53 Resolver, Direct Connect, and Network Firewall. |
+| 🔒 **AWS IAM & Identity Governance** | *(Roadmap)* | Planned | IAM Permission Boundaries, SCPs, ABAC vs RBAC, Cross-Account Roles, and IAM Identity Center. |
+| 📦 **Amazon S3 & Object Storage** | *(Roadmap)* | Planned | S3 Storage Lens, Object Lock (WORM), Replication Rules, Multi-Region Access Points, and S3 Express One Zone. |
+| 🚢 **Containers (EKS & ECS)** | *(Roadmap)* | Planned | EKS Karpenter autoscaling, Fargate serverless containers, Pod Identity, and Service Connect. |
+| ⚡ **Serverless & Event-Driven** | *(Roadmap)* | Planned | Lambda SnapStart, EventBridge Pipes, Step Functions distributed workflows, and SQS FIFO dead-lettering. |
+| 🗄️ **Databases & Caching** | *(Roadmap)* | Planned | Aurora Global Database, DynamoDB Global Tables, ElastiCache Valkey/Redis clustering. |
 
-<details>
-<summary>Click to expand Mermaid diagram source</summary>
+---
 
-```mermaid
-flowchart TD
-    subgraph M1["Module 1: Foundations & Lifecycle"]
-        L1_1["1.1 Launch & Bootstrapping (x86 vs ARM)"]
-        L1_2["1.2 Lifecycle States & Hibernation"]
-        L1_3["1.3 Custom AMIs & Golden Images"]
-    end
+## 🌟 What Makes These Labs Unique?
 
-    subgraph M2["Module 2: Storage Architecture"]
-        L2_1["2.1 EBS Volumes & Live Expansion"]
-        L2_2["2.2 Snapshots, DLM & Multi-Attach"]
-        L2_3["2.3 Ephemeral NVMe Instance Store"]
-        L2_4["2.4 EFS Distributed File System"]
-    end
+Every single laboratory in this repository is built with production standards:
 
-    subgraph M3["Module 3: Networking & Placement"]
-        L3_1["3.1 Dual ENIs & Policy-Based Routing"]
-        L3_2["3.2 Elastic IPs & HA Failover"]
-        L3_3["3.3 Enhanced Networking & ENA Express"]
-        L3_4["3.4 Placement Groups (Cluster/Spread/Partition)"]
-    end
+1. **Architecture First**: Each lab contains visual architecture diagrams (pre-rendered as high-resolution PNG images ready for documentation or Google Docs embedding, along with raw Mermaid source code).
+2. **Production-Ready AWS CLI v2**: Fully automated, copy-paste-ready CLI commands utilizing modern features (IMDSv2 tokens, SSM Parameter Store references, IAM instance profiles, and least-privilege tags).
+3. **Dedicated Command Breakdown Guides (`Explanation/`)**:
+   - Every lab includes a companion `Explanation/lab-XX-explanations.md` file dissecting every command executed.
+   - **Detailed Breakdown of Every Component**: Explains flags, parameters, subshells, piping, and JMESPath `--query` expressions.
+   - **Why This is Critical in Production Automation**: Explains failure modes, security standards, idempotency, and operational best practices.
+4. **Zero-Cost & Free-Tier Guardrails**: Designed to run within the AWS Free Tier wherever possible, including automated cleanup commands and auditing scripts to prevent unexpected cloud spend.
 
-    subgraph M4["Module 4: Security & Zero-Trust Governance"]
-        L4_1["4.1 Security Groups vs NACLs"]
-        L4_2["4.2 IAM Roles & Instance Profiles"]
-        L4_3["4.3 IMDSv2 Hardening & SSRF Defense"]
-        L4_4["4.4 Zero-SSH via SSM Session Manager"]
-    end
+---
 
-    subgraph M5["Module 5: High Availability & Scaling"]
-        L5_1["5.1 Launch Templates & Versioning"]
-        L5_2["5.2 ALB Target Groups & Health Checks"]
-        L5_3["5.3 ASG Dynamic Scaling & Stress Testing"]
-        L5_4["5.4 ASG Lifecycle Hooks & Graceful Drain"]
-    end
+## 🚀 Quick Start: Exploring Amazon EC2 Labs
 
-    subgraph M6["Module 6: Purchasing & Cost Optimization"]
-        L6_1["6.1 Spot Instances & Interruption Handling"]
-        L6_2["6.2 ASG Mixed Instances Policy"]
-        L6_3["6.3 Rightsizing & Compute Optimizer"]
-    end
+To get started with the complete 28-lab Amazon EC2 curriculum:
 
-    subgraph M7["Module 7: Monitoring & Diagnostics"]
-        L7_1["7.1 Status Checks & CloudWatch Auto-Recovery"]
-        L7_2["7.2 Unified CloudWatch Agent (RAM/Disk/Logs)"]
-        L7_3["7.3 Serial Console & EBS Root Volume Rescue"]
-        L7_4["7.4 VPC Flow Logs Analysis"]
-    end
+```bash
+# 1. Clone the repository
+git clone https://github.com/cybercloudsec/AWS-Labs.git
+cd AWS-Labs/EC2
 
-    subgraph M8["Module 8: Advanced Compute & Nitro"]
-        L8_1["8.1 AWS Nitro System Deep Dive"]
-        L8_2["8.2 Nitro Enclaves Isolated Compute"]
-    end
+# 2. Verify your AWS CLI prerequisites
+chmod +x ./scripts/setup_prereqs.sh
+./scripts/setup_prereqs.sh
 
-    M1 --> M2 --> M3 --> M4 --> M5 --> M6 --> M7 --> M8
+# 3. Explore the modules
+ls -l
 ```
-</details>
+
+👉 **Head directly to the [Amazon EC2 Master Labs Curriculum](./EC2)** to begin Module 1!
 
 ---
 
-## 📚 Modules Directory
+## 🧹 Cost & Clean-Up Guardrails
 
-| Module | Directory | Key Concepts Covered |
-| :--- | :--- | :--- |
-| **01. Foundations & Lifecycle** | [`module-01-fundamentals-and-lifecycle/`](./module-01-fundamentals-and-lifecycle) | x86 vs Graviton ARM64 (`t4g`), User Data bootstrapping, EC2 Hibernation, Golden AMIs |
-| **02. Storage Architecture** | [`module-02-storage-ebs-ephemeral-efs/`](./module-02-storage-ebs-ephemeral-efs) | EBS `gp3`/`io2`, Online Elastic Volume Resizing, NVMe Instance Store, Amazon EFS |
-| **03. Networking & Placement** | [`module-03-networking-eni-placement/`](./module-03-networking-eni-placement) | Multi-ENI routing, Elastic IPs & HA failover, ENA Express (SRD), Cluster/Spread/Partition Groups |
-| **04. Security & Zero-Trust** | [`module-04-security-iam-ssm/`](./module-04-security-iam-ssm) | Security Groups vs NACLs, IAM Instance Profiles, IMDSv2 Hardening, Zero-SSH SSM Session Manager |
-| **05. HA, Scaling & Load Balancing** | [`module-05-ha-asg-alb/`](./module-05-ha-asg-alb) | Multi-version Launch Templates, Application Load Balancers, Dynamic Target Tracking ASG, Lifecycle Hooks |
-| **06. Purchasing & Cost** | [`module-06-purchasing-cost-optimization/`](./module-06-purchasing-cost-optimization) | Spot Instances & 2-minute notice handling, Mixed ASG (Spot + On-Demand), Compute Optimizer, gp2-to-gp3 |
-| **07. Monitoring & Troubleshooting**| [`module-07-monitoring-and-troubleshooting/`](./module-07-monitoring-and-troubleshooting) | Status Checks & Auto-Recovery, CloudWatch Unified Agent (RAM/Disk/Logs), Serial Console, EBS Rescue |
-| **08. Advanced Nitro Architecture** | [`module-08-advanced-nitro/`](./module-08-advanced-nitro) | Nitro Cards, Nitro Hypervisor, Nitro Security Chip, Nitro Enclaves isolated compute |
+Always remember to run the teardown steps at the conclusion of each laboratory. To run an automated audit of active lab instances or leftover resources in your AWS account:
 
----
-
-## 🛠️ Prerequisites & Setup
-
-1. **AWS Account**: An active AWS account with administrative or sandbox permissions.
-2. **AWS CLI v2**: Run `aws configure` to set your access keys and target region (e.g. `us-east-1` or `us-west-2`).
-3. **Session Manager Plugin**: Install the AWS Systems Manager Session Manager plugin locally if connecting to instances via CLI without SSH keys.
-4. **Validation**: Run the pre-flight check script:
-   ```bash
-   chmod +x ./scripts/setup_prereqs.sh
-   ./scripts/setup_prereqs.sh
-   ```
-
----
-
-## 💰 Cost Control & Free Tier Guardrails
-
-- **Free Tier Awareness**: All labs utilize `t2.micro`, `t3.micro`, or `t4g.micro` where eligible.
-- **Teardown Responsibility**: Always run the cleanup commands listed at the end of each lab.
-- **Leftover Check**: To scan your account for running lab instances or unattached Elastic IPs, run:
-   ```bash
-   chmod +x ./scripts/cleanup_all.sh
-   ./scripts/cleanup_all.sh
-   ```
+```bash
+chmod +x ./EC2/scripts/cleanup_all.sh
+./EC2/scripts/cleanup_all.sh
+```

@@ -26,10 +26,7 @@ Every single laboratory in this repository is built with production standards:
 
 1. **Architecture First**: Each lab contains visual architecture diagrams (pre-rendered as high-resolution PNG images ready for documentation or Google Docs embedding, along with raw Mermaid source code).
 2. **Production-Ready AWS CLI v2**: Fully automated, copy-paste-ready CLI commands utilizing modern features (IMDSv2 tokens, SSM Parameter Store references, IAM instance profiles, and least-privilege tags).
-3. **Dedicated Command Breakdown Guides (`Explanation/`)**:
-   - Every lab includes a companion `Explanation/lab-XX-explanations.md` file dissecting every command executed.
-   - **Detailed Breakdown of Every Component**: Explains flags, parameters, subshells, piping, and JMESPath `--query` expressions.
-   - **Why This is Critical in Production Automation**: Explains failure modes, security standards, idempotency, and operational best practices.
+3. **Deep Architectural & Operational Concepts**: Every lab explains failure modes, security best practices (IMDSv2, least-privilege IAM, policy routing), idempotency, and operational standards directly within the lab workflow.
 4. **Zero-Cost & Free-Tier Guardrails**: Designed to run within the AWS Free Tier wherever possible, including automated cleanup commands and auditing scripts to prevent unexpected cloud spend.
 
 ---

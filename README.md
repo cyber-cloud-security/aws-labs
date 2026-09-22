@@ -11,12 +11,6 @@ This repository is organized by AWS service domains, providing practical, real-w
 | Service / Domain | Path | Labs Count | Key Focus Areas |
 | :--- | :--- | :---: | :--- |
 | 🖥️ **[Amazon EC2 (Elastic Compute Cloud)](./EC2)** | [`/EC2`](./EC2) | **28 Labs** (8 Modules) | Compute Architectures, Graviton ARM64, EBS Elastic Volumes, NVMe Instance Store, EFS, Dual-ENI Routing, ENA Express (SRD), IMDSv2 Hardening, SSM Session Manager, Launch Templates, ALB & Target Tracking ASG, Spot Fleets & Interruption Watchdogs, FinOps gp3 Modernization, Disaster Recovery (EBS Root Rescue & Serial Console), VPC Flow Logs, and AWS Nitro System & Enclaves. |
-| 🌐 **Amazon VPC & Hybrid Networking** | *(Roadmap)* | Planned | Transit Gateway, VPC Peering, PrivateLink, Route 53 Resolver, Direct Connect, and Network Firewall. |
-| 🔒 **AWS IAM & Identity Governance** | *(Roadmap)* | Planned | IAM Permission Boundaries, SCPs, ABAC vs RBAC, Cross-Account Roles, and IAM Identity Center. |
-| 📦 **Amazon S3 & Object Storage** | *(Roadmap)* | Planned | S3 Storage Lens, Object Lock (WORM), Replication Rules, Multi-Region Access Points, and S3 Express One Zone. |
-| 🚢 **Containers (EKS & ECS)** | *(Roadmap)* | Planned | EKS Karpenter autoscaling, Fargate serverless containers, Pod Identity, and Service Connect. |
-| ⚡ **Serverless & Event-Driven** | *(Roadmap)* | Planned | Lambda SnapStart, EventBridge Pipes, Step Functions distributed workflows, and SQS FIFO dead-lettering. |
-| 🗄️ **Databases & Caching** | *(Roadmap)* | Planned | Aurora Global Database, DynamoDB Global Tables, ElastiCache Valkey/Redis clustering. |
 
 ---
 

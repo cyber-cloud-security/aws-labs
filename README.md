@@ -1,6 +1,6 @@
-# AWS Hands-On Engineering Labs 🚀
+# AWS Hands-On Labs 🚀
 
-Welcome to the **AWS Labs** repository — an enterprise-grade collection of production-ready, hands-on laboratories, step-by-step CLI execution guides, pre-rendered architectural diagrams, and deep-dive technical command explanations for Amazon Web Services (AWS).
+Welcome to the **AWS Labs** repository — hands-on laboratories, step-by-step CLI execution guides, pre-rendered architectural diagrams, and deep-dive technical command explanations for Amazon Web Services (AWS).
 
 This repository is organized by AWS service domains, providing practical, real-world implementations designed for Cloud Architects, DevOps/Platform Engineers, Security Specialists, and System Administrators.
 

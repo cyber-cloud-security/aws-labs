@@ -37,8 +37,8 @@ To get started with the complete 28-lab Amazon EC2 curriculum:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/cybercloudsec/AWS-Labs.git
-cd AWS-Labs/EC2
+git clone https://github.com/cyber-cloud-security/aws-labs.git
+cd aws-labs/EC2
 
 # 2. Verify your AWS CLI prerequisites
 chmod +x ./scripts/setup_prereqs.sh

@@ -6,7 +6,7 @@ This repository is organized by AWS service domains, providing practical, real-w
 
 ---
 
-## 🧭 Service Laboratories Catalog
+## 🧭 Services and Domain
 
 | Service / Domain | Path | Labs Count | Key Focus Areas |
 | :--- | :--- | :---: | :--- |

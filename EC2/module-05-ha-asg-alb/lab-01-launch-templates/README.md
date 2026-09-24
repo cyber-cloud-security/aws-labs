@@ -1,10 +1,23 @@
-# Lab 5.1: EC2 Launch Templates & Multi-Version Management
+<div align="center">
+
+# 🔬 Lab 5.1: EC2 Launch Templates & Multi-Version Management
+
+**[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 05](../README.md)**
+
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-05_%E2%80%94_High_Availability-fd8c73?style=flat-square)
+
+**[⬅️ Previous Lab](../../module-04-security-iam-ssm/lab-04-ssm-session-manager/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-05-ha-asg-alb/lab-02-alb-and-target-groups/README.md)**
+
+</div>
+
+---
 
 ## 📌 Lab Objectives
-- Understand why **Launch Templates** completely superseded legacy Launch Configurations.
-- Author a production Launch Template with multi-versioning support.
-- Implement **Version 1 (x86_64 baseline)** and **Version 2 (Graviton ARM64 with performance tuning)**.
-- Manage default versions and test instance launches against specific template versions.
+
+- [x] Understand why **Launch Templates** completely superseded legacy Launch Configurations.
+- [x] Author a production Launch Template with multi-versioning support.
+- [x] Implement **Version 1 (x86_64 baseline)** and **Version 2 (Graviton ARM64 with performance tuning)**.
+- [x] Manage default versions and test instance launches against specific template versions.
 
 ---
 
@@ -13,17 +26,7 @@
 ![Architecture Diagram](./images/architecture-lab-01.png)
 
 <details>
-<summary>Click to expand Mermaid diagram source</summary>
-
-![Architecture Diagram](./images/architecture-lab-01.png)
-
-<details>
-<summary>Click to expand Mermaid diagram source</summary>
-
-![Architecture Diagram](./images/architecture-lab-01.png)
-
-<details>
-<summary>Click to expand Mermaid diagram source</summary>
+<summary>📐 <b>View Mermaid Architecture Source (Click to Expand)</b></summary>
 
 ```mermaid
 flowchart TD
@@ -35,8 +38,7 @@ flowchart TD
     Dev["Dev Environment"] -->|Explicitly references| V1
     ProdASG["Production Auto Scaling Group"] -->|Configured to track $Default| V2
 ```
-</details>
-</details>
+
 </details>
 
 ---
@@ -54,8 +56,11 @@ flowchart TD
 ---
 
 ## ⏱️ Prerequisites & Cost
-- **AWS Free Tier Eligible**: Yes. Launch Templates themselves are free; only launched instances incur standard usage.
-- **Estimated Duration**: 15 minutes.
+
+> [!TIP]
+> **AWS Free Tier & Cost Guardrail**
+> - **AWS Free Tier Eligible**: Yes. Launch Templates themselves are free; only launched instances incur standard usage.
+> - **Estimated Duration**: 15 minutes.
 
 ---
 
@@ -64,8 +69,14 @@ flowchart TD
 ### Step 1: Discover Base AMIs (x86_64 and ARM64)
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
-export VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query "Vpcs[0].VpcId" --output text)
-export SUBNET_ID=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query "Subnets[0].SubnetId" --output text)
+export VPC_ID=$(aws ec2 describe-vpcs \
+  --filters "Name=isDefault,Values=true" \
+  --query "Vpcs[0].VpcId" \
+  --output text)
+export SUBNET_ID=$(aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=${VPC_ID}" \
+  --query "Subnets[0].SubnetId" \
+  --output text)
 
 AMI_X86=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
@@ -182,7 +193,110 @@ aws ec2 describe-instances \
 
 ---
 
+## 📘 Deep-Dive Command & Flag Reference
+
+> [!TIP]
+> **Line-by-Line Production Analysis**: Every command executed in this lab is dissected below, explaining each CLI flag, JMESPath query, Linux kernel parameter, and why it is critical in production automation.
+
+<details open>
+<summary>📘 <b>Command 1: Creating Launch Template Version 1 (x86_64 Baseline)</b></summary>
+
+```bash
+TEMPLATE_ID=$(aws ec2 create-launch-template \
+  --launch-template-name "web-app-template" \
+  --version-description "Version 1 - x86_64 Baseline" \
+  --launch-template-data file://template-v1.json \
+  --query "LaunchTemplate.LaunchTemplateId" --output text)
+```
+
+#### 🔍 Parameter & Component Breakdown
+
+- **`aws ec2 create-launch-template`** — Creates an immutable specification template that defines all configuration parameters required to launch an instance (AMI, instance type, storage, user data, network interfaces, tags, IAM profiles).
+
+- **`--version-description "Version 1 - x86_64 Baseline"`** — Provides descriptive commit-like metadata explaining what changes or baseline configurations are captured in this revision.
+
+- **`--launch-template-data file://template-v1.json`** — Passes the declarative JSON payload containing configuration attributes.
+  - Launch Templates completely replace legacy **Launch Configurations**. Unlike Launch Configurations (which were unversioned, requiring you to delete and recreate a new resource for every single change), Launch Templates support unlimited revisions under a single template ID.
+
+> 🏭 **Why This Matters in Production Automation**
+> Launch Templates provide the single source of truth for instance definitions across teams. Instead of passing dozens of CLI flags to `run-instances`, automation tools only need to reference the template ID.
+
+</details>
+
+<details open>
+<summary>📘 <b>Command 2: Creating Launch Template Version 2 (Upgrading to Graviton ARM64)</b></summary>
+
+```bash
+aws ec2 create-launch-template-version \
+  --launch-template-id "${TEMPLATE_ID}" \
+  --version-description "Version 2 - Graviton2 ARM64" \
+  --launch-template-data file://template-v2.json
+```
+
+#### 🔍 Parameter & Component Breakdown
+
+- **`aws ec2 create-launch-template-version`** — Appends a new incremented version number (Version 2) to the existing Launch Template container.
+
+- What Changed in Version 2:
+  - Replaced `t3.micro` (Intel x86_64) with `t4g.micro` (AWS Graviton2 ARM64).
+  - Swapped x86 AMI with the certified ARM64 Amazon Linux 2023 AMI.
+  - Injected optimized Graviton User Data.
+
+> 🏭 **Why This Matters in Production Automation**
+> Versioning enables GitOps-style infrastructure management. If Version 2 introduces a bad kernel patch or misconfigured user data, engineers can roll back the fleet to Version 1 instantaneously by changing a single pointer.
+
+</details>
+
+<details open>
+<summary>📘 <b>Command 3: Promoting Version 2 as the Active Default</b></summary>
+
+```bash
+aws ec2 modify-launch-template \
+  --launch-template-id "${TEMPLATE_ID}" \
+  --default-version 2
+```
+
+#### 🔍 Parameter & Component Breakdown
+
+- **`aws ec2 modify-launch-template`** — Updates the top-level pointer metadata of the Launch Template.
+
+- **`--default-version 2`** — Every Launch Template maintains a designated `$Default` version and a `$Latest` version:
+  - **`$Latest`** — Automatically matches the highest numbered revision created.
+  - **`$Default`** — The certified, production-ready version used by Auto Scaling Groups unless explicitly overridden. This command promotes Version 2 to `$Default`.
+
+> 🏭 **Why This Matters in Production Automation**
+> This allows testing new revisions as canary versions (launching test instances explicitly against `$Latest` or Version 3) without impacting production Auto Scaling Groups tracking `$Default`. Once canary testing passes, a single `modify-launch-template` call updates production.
+
+</details>
+
+<details open>
+<summary>📘 <b>Command 4: Launching an Instance Using the Default Template Pointer</b></summary>
+
+```bash
+TEST_INSTANCE_ID=$(aws ec2 run-instances \
+  --launch-template "LaunchTemplateId=${TEMPLATE_ID},Version=\$Default" \
+  --subnet-id "${SUBNET_ID}" \
+  --query "Instances[0].InstanceId" --output text)
+```
+
+#### 🔍 Parameter & Component Breakdown
+
+- `--launch-template "LaunchTemplateId=${TEMPLATE_ID},Version=\$Default"`
+  - **`LaunchTemplateId=...`** — References the template container.
+  - **`Version=\$Default`** — **Bash Escaping Rule**: Notice the backslash before `$Default` (`\$Default`). If omitted, bash treats `$Default` as an empty local shell variable, causing the CLI parameter to evaluate to `Version=`, which results in a syntax validation error!
+
+> 🏭 **Why This Matters in Production Automation**
+> Decoupling instance deployment commands from specific AMI IDs or instance sizes ensures that CI/CD deployment scripts never need to be rewritten when application architectures or instance generations evolve.
+
+</details>
+
+---
+
 ## 🧹 Teardown & Clean-up
+
+
+> [!CAUTION]
+> **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
 ```bash
 # 1. Terminate instance
@@ -195,3 +309,11 @@ rm -f template-v1.json template-v2.json
 
 echo "Lab 5.1 clean-up completed successfully."
 ```
+
+---
+
+<div align="center">
+
+**[⬅️ Previous Lab](../../module-04-security-iam-ssm/lab-04-ssm-session-manager/README.md)** &nbsp;•&nbsp; **[⬆️ Back to Module 05](../README.md)** &nbsp;•&nbsp; **[🏠 EC2 Index](../../README.md)** &nbsp;•&nbsp; **[➡️ Next Lab](../../module-05-ha-asg-alb/lab-02-alb-and-target-groups/README.md)**
+
+</div>

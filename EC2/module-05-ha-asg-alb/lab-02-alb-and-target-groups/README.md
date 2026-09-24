@@ -1,10 +1,23 @@
-# Lab 5.2: Application Load Balancer (ALB), Target Groups & Health Checks
+<div align="center">
+
+# 🔬 Lab 5.2: Application Load Balancer (ALB), Target Groups & Health Checks
+
+**[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 05](../README.md)**
+
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Paid_%28~%240.05_--_%240.15%29-d29922?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-05_%E2%80%94_High_Availability-fd8c73?style=flat-square)
+
+**[⬅️ Previous Lab](../../module-05-ha-asg-alb/lab-01-launch-templates/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-05-ha-asg-alb/lab-03-asg-dynamic-scaling/README.md)**
+
+</div>
+
+---
 
 ## 📌 Lab Objectives
-- Deploy an internet-facing **Application Load Balancer (ALB)** across multiple Availability Zones.
-- Configure an **ALB Target Group** with custom HTTP health check thresholds and connection draining (**deregistration delay**).
-- Register EC2 instances across different Availability Zones and monitor target health states (`healthy`, `unhealthy`, `draining`).
-- Test Layer-7 request load balancing and observe round-robin distribution.
+
+- [x] Deploy an internet-facing **Application Load Balancer (ALB)** across multiple Availability Zones.
+- [x] Configure an **ALB Target Group** with custom HTTP health check thresholds and connection draining (**deregistration delay**).
+- [x] Register EC2 instances across different Availability Zones and monitor target health states (`healthy`, `unhealthy`, `draining`).
+- [x] Test Layer-7 request load balancing and observe round-robin distribution.
 
 ---
 
@@ -13,17 +26,7 @@
 ![Architecture Diagram](./images/architecture-lab-02.png)
 
 <details>
-<summary>Click to expand Mermaid diagram source</summary>
-
-![Architecture Diagram](./images/architecture-lab-02.png)
-
-<details>
-<summary>Click to expand Mermaid diagram source</summary>
-
-![Architecture Diagram](./images/architecture-lab-02.png)
-
-<details>
-<summary>Click to expand Mermaid diagram source</summary>
+<summary>📐 <b>View Mermaid Architecture Source (Click to Expand)</b></summary>
 
 ```mermaid
 flowchart TD
@@ -51,8 +54,7 @@ flowchart TD
     HC -.->|Periodic Ping| EC2_A
     HC -.->|Periodic Ping| EC2_B
 ```
-</details>
-</details>
+
 </details>
 
 ---
@@ -70,8 +72,11 @@ flowchart TD
 ---
 
 ## ⏱️ Prerequisites & Cost
-- **Cost Warning**: ALBs are billed at ~$0.0225/hour plus LCU usage. Run the test and execute teardown promptly (estimated cost < $0.05).
-- **Estimated Duration**: 20 minutes.
+
+> [!WARNING]
+> **Paid Instance / Storage Notice**
+> - **Cost Warning**: ALBs are billed at ~$0.0225/hour plus LCU usage. Run the test and execute teardown promptly (estimated cost < $0.05).
+> - **Estimated Duration**: 20 minutes.
 
 ---
 
@@ -80,10 +85,19 @@ flowchart TD
 ### Step 1: Launch Two Web Server Instances Across Separate AZs
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
-export VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query "Vpcs[0].VpcId" --output text)
+export VPC_ID=$(aws ec2 describe-vpcs \
+  --filters "Name=isDefault,Values=true" \
+  --query "Vpcs[0].VpcId" \
+  --output text)
 
-SUBNET_1=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query "Subnets[0].SubnetId" --output text)
-SUBNET_2=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query "Subnets[1].SubnetId" --output text)
+SUBNET_1=$(aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=${VPC_ID}" \
+  --query "Subnets[0].SubnetId" \
+  --output text)
+SUBNET_2=$(aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=${VPC_ID}" \
+  --query "Subnets[1].SubnetId" \
+  --output text)
 
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
@@ -223,7 +237,131 @@ Server: NODE-B
 
 ---
 
+## 📘 Deep-Dive Command & Flag Reference
+
+> [!TIP]
+> **Line-by-Line Production Analysis**: Every command executed in this lab is dissected below, explaining each CLI flag, JMESPath query, Linux kernel parameter, and why it is critical in production automation.
+
+<details open>
+<summary>📘 <b>Command 1: Creating an ALB Target Group with Custom Health Checks</b></summary>
+
+```bash
+TG_ARN=$(aws elbv2 create-target-group \
+  --name "tg-ec2-labs" \
+  --protocol HTTP \
+  --port 80 \
+  --vpc-id "${VPC_ID}" \
+  --health-check-protocol HTTP \
+  --health-check-path "/" \
+  --health-check-interval-seconds 15 \
+  --healthy-threshold-count 2 \
+  --unhealthy-threshold-count 2 \
+  --target-type instance \
+  --query "TargetGroups[0].TargetGroupArn" --output text)
+```
+
+#### 🔍 Parameter & Component Breakdown
+
+- **`aws elbv2 create-target-group`** — Defines a logical pool of destination compute backends (EC2 instances, IP addresses, or Lambda functions) that receive routed traffic.
+
+- **`--protocol HTTP` & `--port 80`** — The protocol and port the load balancer uses to forward traffic to the target instances.
+
+- Health Check Configurations:
+  - **`--health-check-path "/"`** — The URI endpoint queried by the ALB to verify backend application health.
+  - **`--health-check-interval-seconds 15`** — ALB nodes query the health check endpoint every 15 seconds.
+  - **`--unhealthy-threshold-count 2`** — If a target fails 2 consecutive checks, the ALB immediately marks it `unhealthy` and ceases routing traffic to it.
+  - **`--healthy-threshold-count 2`** — A recovering instance must pass 2 consecutive checks before the ALB resumes routing traffic to it.
+
+- **`--target-type instance`** — Targets are identified by EC2 Instance ID.
+*Alternative*: `ip` (used for microservices running in Docker containers, ECS tasks, or Kubernetes Pods on AWS VPC CNI).
+
+> 🏭 **Why This Matters in Production Automation**
+> Target Groups decouple traffic ingress from specific compute backends. Fast health check intervals (15s interval, 2 thresholds) ensure that crashed backend nodes are ejected from service in 30 seconds rather than lingering for minutes.
+
+</details>
+
+<details open>
+<summary>📘 <b>Command 2: Tuning Connection Draining (Deregistration Delay)</b></summary>
+
+```bash
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn "${TG_ARN}" \
+  --attributes "Key=deregistration_delay.timeout_seconds,Value=30"
+```
+
+#### 🔍 Parameter & Component Breakdown
+
+- **`deregistration_delay.timeout_seconds`** — Controls **Connection Draining**.
+When an instance is deregistered (e.g. during a deployment, auto scaling scale-in, or manual termination):  
+1. The ALB immediately stops routing *new* connections to that target.  
+2. The ALB keeps existing, in-flight HTTP connections alive for up to `Value` seconds, allowing active requests to complete gracefully.  
+3. Default AWS timeout is **300 seconds** (5 minutes). Setting this to **30 seconds** accelerates CI/CD blue/green deployments and test suites.
+
+> 🏭 **Why This Matters in Production Automation**
+> Without connection draining, terminating or replacing an instance immediately severs active TCP sockets, throwing HTTP 502 Bad Gateway or 504 Gateway Timeout errors to active users.
+
+</details>
+
+<details open>
+<summary>📘 <b>Command 3: Provisioning the Application Load Balancer</b></summary>
+
+```bash
+ALB_ARN=$(aws elbv2 create-load-balancer \
+  --name "alb-ec2-labs" \
+  --subnets "${SUBNET_1}" "${SUBNET_2}" \
+  --security-groups "${ALB_SG_ID}" \
+  --scheme internet-facing \
+  --type application \
+  --query "LoadBalancers[0].LoadBalancerArn" --output text)
+```
+
+#### 🔍 Parameter & Component Breakdown
+
+- **`aws elbv2 create-load-balancer`** — Provisions a dedicated Layer 7 Application Load Balancer.
+
+- **`--subnets "${SUBNET_1}" "${SUBNET_2}"`** — **Mandatory Multi-AZ Rule**:
+An Application Load Balancer **must be configured with at least two subnets located in different Availability Zones**. AWS deploys managed load balancer nodes across these zones to ensure high availability.
+
+- **`--scheme internet-facing`** — Assigns publicly routable IP addresses and public DNS names to the ALB nodes.
+*Alternative*: `internal` (used for private microservice meshes with internal-only VPC routing).
+
+- **`--type application`** — Operates at OSI Layer 7 (HTTP/HTTPS), supporting URL path routing, host routing, HTTP headers, and WebSockets.
+
+> 🏭 **Why This Matters in Production Automation**
+> ALBs automatically scale their internal capacity up and down to handle millions of requests per second, abstracting DNS round-robin and multi-datacenter failover seamlessly.
+
+</details>
+
+<details open>
+<summary>📘 <b>Command 4: Creating the HTTP Listener</b></summary>
+
+```bash
+LISTENER_ARN=$(aws elbv2 create-listener \
+  --load-balancer-arn "${ALB_ARN}" \
+  --protocol HTTP \
+  --port 80 \
+  --default-actions "Type=forward,TargetGroupArn=${TG_ARN}" \
+  --query "Listeners[0].ListenerArn" --output text)
+```
+
+#### 🔍 Parameter & Component Breakdown
+
+- **`aws elbv2 create-listener`** — Binds a listening process to the public front door of the load balancer on port 80.
+
+- **`--default-actions "Type=forward,TargetGroupArn=${TG_ARN}"`** — Defines the default rule: any incoming request matching port 80 is forwarded directly to the backend compute instances registered in the Target Group.
+
+> 🏭 **Why This Matters in Production Automation**
+> Listeners can be configured with complex routing rule trees (e.g. forwarding `/api/*` to an API Target Group, `/static/*` to S3, and issuing automatic HTTP-to-HTTPS 301 redirects).
+
+</details>
+
+---
+
 ## 🧹 Teardown & Clean-up
+
+
+> [!CAUTION]
+> **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
 ```bash
 # 1. Delete ALB and Listener
@@ -240,3 +378,11 @@ aws ec2 delete-security-group --group-id "${ALB_SG_ID}"
 
 echo "Lab 5.2 clean-up completed successfully."
 ```
+
+---
+
+<div align="center">
+
+**[⬅️ Previous Lab](../../module-05-ha-asg-alb/lab-01-launch-templates/README.md)** &nbsp;•&nbsp; **[⬆️ Back to Module 05](../README.md)** &nbsp;•&nbsp; **[🏠 EC2 Index](../../README.md)** &nbsp;•&nbsp; **[➡️ Next Lab](../../module-05-ha-asg-alb/lab-03-asg-dynamic-scaling/README.md)**
+
+</div>

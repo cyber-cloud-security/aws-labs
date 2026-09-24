@@ -1,10 +1,23 @@
-# Lab 6.2: Auto Scaling Groups with Mixed Instances Policy (Spot + On-Demand)
+<div align="center">
+
+# 🔬 Lab 6.2: Auto Scaling Groups with Mixed Instances Policy (Spot + On-Demand)
+
+**[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 06](../README.md)**
+
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-06_%E2%80%94_Purchasing_Models_%26_FinOps_Cost_Optimization-fd8c73?style=flat-square)
+
+**[⬅️ Previous Lab](../../module-06-purchasing-cost-optimization/lab-01-spot-interruption-handling/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-06-purchasing-cost-optimization/lab-03-cost-optimization-rightsizing/README.md)**
+
+</div>
+
+---
 
 ## 📌 Lab Objectives
-- Build an enterprise-grade resilient compute cluster combining **On-Demand Baseline** instances with **Spot Instances**.
-- Implement **Instance Type Diversification** across multiple families (`t3.micro`, `t3a.micro`, `t2.micro`) to prevent Spot pool depletion outages.
-- Configure `OnDemandBaseCapacity=1` and `OnDemandPercentageAboveBaseCapacity=20` (80% Spot).
-- Use the `price-capacity-optimized` Spot allocation strategy.
+
+- [x] Build an enterprise-grade resilient compute cluster combining **On-Demand Baseline** instances with **Spot Instances**.
+- [x] Implement **Instance Type Diversification** across multiple families (`t3.micro`, `t3a.micro`, `t2.micro`) to prevent Spot pool depletion outages.
+- [x] Configure `OnDemandBaseCapacity=1` and `OnDemandPercentageAboveBaseCapacity=20` (80% Spot).
+- [x] Use the `price-capacity-optimized` Spot allocation strategy.
 
 ---
 
@@ -13,17 +26,7 @@
 ![Architecture Diagram](./images/architecture-lab-02.png)
 
 <details>
-<summary>Click to expand Mermaid diagram source</summary>
-
-![Architecture Diagram](./images/architecture-lab-02.png)
-
-<details>
-<summary>Click to expand Mermaid diagram source</summary>
-
-![Architecture Diagram](./images/architecture-lab-02.png)
-
-<details>
-<summary>Click to expand Mermaid diagram source</summary>
+<summary>📐 <b>View Mermaid Architecture Source (Click to Expand)</b></summary>
 
 ```mermaid
 flowchart TD
@@ -45,8 +48,7 @@ flowchart TD
 
     Policy ==> RunningNodes
 ```
-</details>
-</details>
+
 </details>
 
 ---
@@ -63,8 +65,11 @@ flowchart TD
 ---
 
 ## ⏱️ Prerequisites & Cost
-- **AWS Free Tier Eligible**: Yes (`t3.micro`/`t2.micro` family).
-- **Estimated Duration**: 15 minutes.
+
+> [!TIP]
+> **AWS Free Tier & Cost Guardrail**
+> - **AWS Free Tier Eligible**: Yes (`t3.micro`/`t2.micro` family).
+> - **Estimated Duration**: 15 minutes.
 
 ---
 
@@ -73,9 +78,18 @@ flowchart TD
 ### Step 1: Create the Base Launch Template
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
-export VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query "Vpcs[0].VpcId" --output text)
-SUBNET_1=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query "Subnets[0].SubnetId" --output text)
-SUBNET_2=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query "Subnets[1].SubnetId" --output text)
+export VPC_ID=$(aws ec2 describe-vpcs \
+  --filters "Name=isDefault,Values=true" \
+  --query "Vpcs[0].VpcId" \
+  --output text)
+SUBNET_1=$(aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=${VPC_ID}" \
+  --query "Subnets[0].SubnetId" \
+  --output text)
+SUBNET_2=$(aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=${VPC_ID}" \
+  --query "Subnets[1].SubnetId" \
+  --output text)
 
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
@@ -162,7 +176,187 @@ Notice:
 
 ---
 
+## 📘 Deep-Dive Command & Flag Reference
+
+> [!TIP]
+> **Line-by-Line Production Analysis**: Every command executed in this lab is dissected below, explaining each CLI flag, JMESPath query, Linux kernel parameter, and why it is critical in production automation.
+
+<details open>
+<summary>📘 <b>Command 1 & 2: Environment Discovery and Base Launch Template Creation</b></summary>
+
+```bash
+export AWS_REGION=$(aws configure get region || echo "us-east-1")
+export VPC_ID=$(aws ec2 describe-vpcs \
+  --filters "Name=isDefault,Values=true" \
+  --query "Vpcs[0].VpcId" \
+  --output text)
+SUBNET_1=$(aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=${VPC_ID}" \
+  --query "Subnets[0].SubnetId" \
+  --output text)
+SUBNET_2=$(aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=${VPC_ID}" \
+  --query "Subnets[1].SubnetId" \
+  --output text)
+
+AMI_ID=$(aws ssm get-parameter \
+  --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
+  --query "Parameter.Value" --output text)
+
+cat <<JSON > mixed-lt.json
+{
+  "ImageId": "${AMI_ID}",
+  "MetadataOptions": { "HttpTokens": "required" }
+}
+JSON
+
+LT_ID=$(aws ec2 create-launch-template \
+  --launch-template-name "lt-mixed-demo" \
+  --launch-template-data file://mixed-lt.json \
+  --query "LaunchTemplate.LaunchTemplateId" --output text)
+```
+
+#### 🔍 Parameter & Component Breakdown
+- **`export AWS_REGION=...`, `VPC_ID=...`, `SUBNET_1=...`, `SUBNET_2=...`** — Discovers networking topology across two distinct Availability Zones for multi-AZ resiliency.
+- **`AMI_ID=$(aws ssm get-parameter ...)`** — Resolves the latest Amazon Linux 2023 AMI identifier dynamically.
+- **`cat <<JSON > mixed-lt.json`** — Generates the Launch Template specification. Note that `InstanceType` is omitted from the template body; instance types will be injected dynamically via the Mixed Instances Policy overrides.
+- **`"MetadataOptions": { "HttpTokens": "required" }`** — Enforces IMDSv2 token security across all fleet instances.
+- **`LT_ID=$(aws ec2 create-launch-template ...)`** — Creates the launch template and captures its ID.
+
+> 🏭 **Why This Matters in Production Automation**
+> Separating the machine image and bootstrap definitions from specific instance types allows a single template to back diverse instance families simultaneously without duplicate configuration drift.
+
+</details>
+
+<details open>
+<summary>📘 <b>Command 3: Authoring the Mixed Instances Policy Specification</b></summary>
+
+```bash
+cat <<JSON > mixed-policy.json
+{
+  "LaunchTemplate": {
+    "LaunchTemplateSpecification": {
+      "LaunchTemplateId": "${LT_ID}",
+      "Version": "\$Latest"
+    },
+    "Overrides": [
+      { "InstanceType": "t3.micro" },
+      { "InstanceType": "t3a.micro" },
+      { "InstanceType": "t2.micro" }
+    ]
+  },
+  "InstancesDistribution": {
+    "OnDemandAllocationStrategy": "prioritized",
+    "OnDemandBaseCapacity": 1,
+    "OnDemandPercentageAboveBaseCapacity": 20,
+    "SpotAllocationStrategy": "price-capacity-optimized"
+  }
+}
+JSON
+```
+
+#### 🔍 Parameter & Component Breakdown
+- **`"LaunchTemplateSpecification"`** — Binds the ASG to our base Launch Template using the dynamic `$Latest` version.
+- **`"Overrides"`** — Defines the instance type diversification list. The ASG can fulfill compute capacity using `t3.micro` (Intel), `t3a.micro` (AMD EPYC), or `t2.micro`.
+- **`"InstancesDistribution"`** — Dictates the purchasing model distribution:
+  - **`"OnDemandAllocationStrategy": "prioritized"`** — Launches On-Demand instances in the priority order specified by the `Overrides` list (prefers `t3.micro` first).
+  - **`"OnDemandBaseCapacity": 1`** — Guarantees that the first instance in the cluster is strictly On-Demand. It will never be interrupted.
+  - **`"OnDemandPercentageAboveBaseCapacity": 20`** — For any capacity beyond the base 1 instance, 20% will be On-Demand and 80% will be Spot.
+  - **`"SpotAllocationStrategy": "price-capacity-optimized"`** — Evaluates pool depth and price, provisioning Spot instances from pools with the highest spare capacity to minimize interruption frequency.
+
+> 🏭 **Why This Matters in Production Automation**
+> Relying on a single Spot instance type introduces severe availability risks if AWS reclaims capacity in that specific pool. Instance type diversification across multiple families and architectures ensures high availability, while `OnDemandBaseCapacity` ensures baseline cluster stability at up to 80% total cost savings.
+
+</details>
+
+<details open>
+<summary>📘 <b>Command 4: Deploying the ASG with Mixed Instances Policy</b></summary>
+
+```bash
+aws autoscaling create-auto-scaling-group \
+  --auto-scaling-group-name "asg-mixed-fleet-demo" \
+  --mixed-instances-policy file://mixed-policy.json \
+  --min-size 1 \
+  --max-size 5 \
+  --desired-capacity 3 \
+  --vpc-zone-identifier "${SUBNET_1},${SUBNET_2}"
+
+sleep 25
+```
+
+#### 🔍 Parameter & Component Breakdown
+- **`aws autoscaling create-auto-scaling-group`** — Launches the Auto Scaling Group.
+- **`--mixed-instances-policy file://mixed-policy.json`** — Uses the mixed purchasing model rather than a standard single-type launch template.
+- **`--min-size 1 --max-size 5 --desired-capacity 3`** — Requests 3 total instances. According to our policy, 1 node is guaranteed On-Demand base, and the remaining 2 nodes are allocated according to the 20/80 split (resulting in Spot nodes).
+- **`--vpc-zone-identifier "${SUBNET_1},${SUBNET_2}"`** — Spans the instances across multiple Availability Zones.
+- **`sleep 25`** — Allows time for the ASG engine to evaluate pools, fulfill spot bids, and boot instances.
+
+> 🏭 **Why This Matters in Production Automation**
+> Declarative configuration via `--mixed-instances-policy` eliminates complex custom fleet provisioning scripts, allowing AWS's native control plane to manage Spot requests, pool monitoring, and automatic failover transparently.
+
+</details>
+
+<details open>
+<summary>📘 <b>Command 5: Auditing Instance Types and Pricing Distribution</b></summary>
+
+```bash
+aws ec2 describe-instances \
+  --filters "Name=tag:aws:autoscaling:groupName,Values=asg-mixed-fleet-demo" \
+  --query "Reservations[*].Instances[*].[InstanceId,InstanceType,InstanceLifecycle||'on-demand',Placement.AvailabilityZone]" \
+  --output table
+```
+
+#### 🔍 Parameter & Component Breakdown
+- **`aws ec2 describe-instances`** — Queries EC2 instance attributes.
+- **`--filters "Name=tag:aws:autoscaling:groupName,Values=asg-mixed-fleet-demo"`** — Filters for instances managed by our ASG (AWS automatically tags instances with the ASG group name).
+- **`--query "...[InstanceId,InstanceType,InstanceLifecycle||'on-demand',Placement.AvailabilityZone]"`** — JMESPath projection pulling:
+  - **`InstanceId`** — Physical EC2 ID.
+  - **`InstanceType`** — Demonstrates diversification (e.g. `t3.micro` vs `t3a.micro`).
+  - **`InstanceLifecycle||'on-demand'`** — Shows `spot` for Spot nodes or falls back to literal `'on-demand'` for On-Demand nodes.
+  - **`Placement.AvailabilityZone`** — Verifies balanced deployment across multiple AZs.
+- **`--output table`** — Outputs a clean tabular overview.
+
+> 🏭 **Why This Matters in Production Automation**
+> Verifies that the mixed fleet policy complied precisely with architectural boundaries: proving that the base node is running On-Demand while secondary surge nodes are running on diversified Spot capacity across multiple AZs.
+
+</details>
+
+<details open>
+<summary>📘 <b>Command 6: Automated Teardown and Cleanup</b></summary>
+
+```bash
+aws autoscaling update-auto-scaling-group \
+  --auto-scaling-group-name "asg-mixed-fleet-demo" \
+  --min-size 0 \
+  --desired-capacity 0
+
+sleep 15
+aws autoscaling delete-auto-scaling-group \
+  --auto-scaling-group-name "asg-mixed-fleet-demo" \
+  --force-delete
+
+aws ec2 delete-launch-template --launch-template-id "${LT_ID}"
+rm -f mixed-lt.json mixed-policy.json
+```
+
+#### 🔍 Parameter & Component Breakdown
+- **`aws autoscaling update-auto-scaling-group ... --min-size 0 --desired-capacity 0`** — Triggers termination of all active On-Demand and Spot instances.
+- **`aws autoscaling delete-auto-scaling-group --force-delete`** — Destroys the ASG definition.
+- **`aws ec2 delete-launch-template`** — Removes the base Launch Template.
+- **`rm -f mixed-lt.json mixed-policy.json`** — Deletes local configuration files.
+
+> 🏭 **Why This Matters in Production Automation**
+> Clean removal of multi-instance pools prevents lingering compute costs and avoids resource collisions during continuous integration test suite executions.
+
+</details>
+
+---
+
 ## 🧹 Teardown & Clean-up
+
+
+> [!CAUTION]
+> **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
 ```bash
 # 1. Terminate fleet
@@ -182,3 +376,11 @@ rm -f mixed-lt.json mixed-policy.json
 
 echo "Lab 6.2 clean-up completed successfully."
 ```
+
+---
+
+<div align="center">
+
+**[⬅️ Previous Lab](../../module-06-purchasing-cost-optimization/lab-01-spot-interruption-handling/README.md)** &nbsp;•&nbsp; **[⬆️ Back to Module 06](../README.md)** &nbsp;•&nbsp; **[🏠 EC2 Index](../../README.md)** &nbsp;•&nbsp; **[➡️ Next Lab](../../module-06-purchasing-cost-optimization/lab-03-cost-optimization-rightsizing/README.md)**
+
+</div>

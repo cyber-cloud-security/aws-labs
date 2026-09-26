@@ -29,6 +29,26 @@
       background: #374151;
       border-radius: 4px;
     }
+
+    /* Red / Crimson slow flashing border highlight */
+    @keyframes crimson-flash {
+      0%, 100% {
+        border-color: rgba(225, 29, 72, 0.45);
+        box-shadow: 0 0 14px rgba(225, 29, 72, 0.35), inset 0 0 10px rgba(225, 29, 72, 0.15);
+      }
+      50% {
+        border-color: rgba(244, 63, 94, 1);
+        box-shadow: 0 0 28px rgba(244, 63, 94, 0.85), inset 0 0 16px rgba(244, 63, 94, 0.35);
+      }
+    }
+    .crimson-highlight {
+      animation: crimson-flash 2.2s ease-in-out infinite !important;
+      border-width: 2px !important;
+      border-style: solid !important;
+      border-color: rgba(244, 63, 94, 0.9) !important;
+      position: relative;
+      z-index: 20;
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4 md:p-6 antialiased">
@@ -40,7 +60,9 @@
         <div class="flex items-center gap-2 mb-1 flex-wrap">
           <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">AWS Lab 1.1</span>
           <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">EC2 & Graviton ARM64</span>
-          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Hosted on GitHub Pages</span>
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span> Crimson Focus Active
+          </span>
         </div>
         <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
           <span>🚀 Launching & Bootstrapping EC2</span>
@@ -101,9 +123,14 @@
         </div>
 
         <div class="p-4">
-          <div class="text-xs text-slate-400 font-mono mb-1.5 flex justify-between items-center">
-            <span>Executed Command:</span>
-            <span id="progressTimer" class="text-[10px] text-blue-400 font-mono"></span>
+          <div class="text-xs text-slate-400 font-mono mb-2 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-300">Executed Command:</span>
+              <button id="copyBtn" onclick="copyCurrentCommand()" class="px-2.5 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-mono flex items-center gap-1.5 transition active:scale-95 shadow-sm" title="Copy CLI command to clipboard">
+                <span id="copyIcon">📋</span> <span id="copyText">Copy</span>
+              </button>
+            </div>
+            <span id="copyFeedback" class="text-[10px] text-emerald-400 font-mono font-semibold hidden animate-pulse">✓ Copied!</span>
           </div>
           <div class="bg-black/80 rounded-xl p-3 border border-slate-800/80 font-mono text-xs text-emerald-400 overflow-x-auto code-scroll relative group">
             <pre id="commandBox" class="whitespace-pre-wrap leading-relaxed"></pre>
@@ -114,8 +141,8 @@
       <!-- Action & Under the Hood Mechanics -->
       <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
         <div>
-          <div class="text-xs font-bold uppercase tracking-wider text-blue-400 mb-1 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
+          <div class="text-xs font-bold uppercase tracking-wider text-rose-400 mb-1 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
             <span>What This Command Does in AWS</span>
           </div>
           <h2 id="stepTitle" class="text-lg font-bold text-white mb-2"></h2>
@@ -187,14 +214,14 @@
           </div>
 
           <!-- Mid Section: Default VPC & Internet Gateway & Subnet -->
-          <div class="relative z-10 my-4 p-4 rounded-xl border border-indigo-500/30 bg-indigo-950/10">
+          <div id="nodeVPC" class="relative z-10 my-4 p-4 rounded-xl border border-indigo-500/30 bg-indigo-950/10 transition-all duration-500">
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-bold text-indigo-400">🌐 Default VPC</span>
                 <span class="text-[10px] font-mono text-slate-500">172.31.0.0/16</span>
               </div>
               <!-- Internet Gateway -->
-              <div id="nodeIGW" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 text-xs">
+              <div id="nodeIGW" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 text-xs transition-all duration-500">
                 <span>🚪</span>
                 <span class="font-mono text-[11px]">IGW (Internet Gateway)</span>
               </div>
@@ -267,9 +294,9 @@
           <!-- Bottom: Live Traffic / Animation Packet Flow description -->
           <div class="relative z-10 bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
             <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+              <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
               <span class="text-slate-400">Active Packet / API Call:</span>
-              <span id="activePacketLabel" class="font-mono text-blue-300 text-xs">Awaiting command start...</span>
+              <span id="activePacketLabel" class="font-mono text-rose-300 text-xs">Awaiting command start...</span>
             </div>
             <div id="packetSpeedBadge" class="text-[10px] text-slate-500 font-mono">0.5x Speed (6.4s / step)</div>
           </div>
@@ -461,8 +488,42 @@
       `).join('');
     }
 
+    function clearCrimsonHighlights() {
+      const ids = ['nodeVPC', 'nodeSG', 'nodeSSM', 'nodeEC2', 'nodeIMDS', 'nodeIGW', 'nodeClient'];
+      ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('crimson-highlight');
+      });
+    }
+
+    function applyCrimsonHighlight(stepId) {
+      clearCrimsonHighlights();
+      if (stepId === 1) {
+        document.getElementById('nodeVPC')?.classList.add('crimson-highlight');
+        document.getElementById('nodeClient')?.classList.add('crimson-highlight');
+      } else if (stepId === 2) {
+        document.getElementById('nodeSG')?.classList.add('crimson-highlight');
+      } else if (stepId === 3) {
+        document.getElementById('nodeSSM')?.classList.add('crimson-highlight');
+      } else if (stepId === 4) {
+        document.getElementById('nodeEC2')?.classList.add('crimson-highlight');
+      } else if (stepId === 5) {
+        document.getElementById('nodeEC2')?.classList.add('crimson-highlight');
+        document.getElementById('nodeIMDS')?.classList.add('crimson-highlight');
+      } else if (stepId === 6) {
+        document.getElementById('nodeIGW')?.classList.add('crimson-highlight');
+        document.getElementById('nodeEC2')?.classList.add('crimson-highlight');
+      } else if (stepId === 7) {
+        document.getElementById('nodeEC2')?.classList.add('crimson-highlight');
+        document.getElementById('nodeSG')?.classList.add('crimson-highlight');
+      }
+    }
+
     function updateCanvas(step) {
       const u = step.stateUpdate;
+
+      // Apply slow flashing crimson border on the active items on the right side
+      applyCrimsonHighlight(step.id);
 
       // Node Client
       const nodeClient = document.getElementById('nodeClient');
@@ -478,9 +539,9 @@
       const nodeSSM = document.getElementById('nodeSSM');
       if (u.ssm === "active") {
         nodeSSM.classList.remove('opacity-40');
-        nodeSSM.classList.add('opacity-100', 'border-amber-500', 'active-step-glow');
+        nodeSSM.classList.add('opacity-100', 'border-amber-500');
       } else {
-        nodeSSM.classList.remove('border-amber-500', 'active-step-glow');
+        nodeSSM.classList.remove('border-amber-500');
         nodeSSM.classList.add('opacity-40');
       }
 
@@ -518,7 +579,7 @@
       const bootstrapBadge = document.getElementById('bootstrapBadge');
 
       if (u.ec2 === "initializing") {
-        nodeEC2.className = "bg-slate-900/90 border-2 border-blue-500 rounded-xl p-3 opacity-100 active-step-glow relative";
+        nodeEC2.className = "bg-slate-900/90 border-2 border-blue-500 rounded-xl p-3 opacity-100 relative";
         ec2State.innerText = "initializing";
         ec2State.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-900 text-blue-300 font-bold animate-pulse";
         ec2Type.innerText = "t4g.micro";
@@ -528,7 +589,7 @@
         ec2Nginx.className = "text-amber-400 font-bold";
         bootstrapBadge.classList.remove('hidden');
       } else if (u.ec2 === "bootstrapping") {
-        nodeEC2.className = "bg-slate-900/90 border-2 border-amber-500 rounded-xl p-3 opacity-100 active-step-glow relative";
+        nodeEC2.className = "bg-slate-900/90 border-2 border-amber-500 rounded-xl p-3 opacity-100 relative";
         ec2State.innerText = "running (bootstrap)";
         ec2State.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-900 text-amber-200 font-bold";
         ec2Type.innerText = "t4g.micro";
@@ -576,13 +637,13 @@
       const nodeIMDS = document.getElementById('nodeIMDS');
       if (u.imds === "active") {
         nodeIMDS.classList.remove('opacity-40');
-        nodeIMDS.classList.add('opacity-100', 'border-emerald-500/60', 'active-step-glow');
+        nodeIMDS.classList.add('opacity-100', 'border-emerald-500/60');
       } else if (u.imds === "enforced") {
         nodeIMDS.classList.remove('opacity-40');
         nodeIMDS.classList.add('opacity-90', 'border-blue-500/40');
       } else {
         nodeIMDS.classList.add('opacity-40');
-        nodeIMDS.classList.remove('opacity-100', 'border-emerald-500/60', 'active-step-glow', 'border-blue-500/40');
+        nodeIMDS.classList.remove('opacity-100', 'border-emerald-500/60', 'border-blue-500/40');
       }
     }
 
@@ -606,6 +667,27 @@
 
       renderSteppers();
       updateCanvas(step);
+    }
+
+    function copyCurrentCommand() {
+      const cmd = steps[currentStep].command;
+      navigator.clipboard.writeText(cmd).then(() => {
+        const copyText = document.getElementById('copyText');
+        const copyIcon = document.getElementById('copyIcon');
+        const feedback = document.getElementById('copyFeedback');
+        
+        copyText.innerText = "Copied!";
+        copyIcon.innerText = "✅";
+        if (feedback) feedback.classList.remove('hidden');
+        
+        setTimeout(() => {
+          copyText.innerText = "Copy";
+          copyIcon.innerText = "📋";
+          if (feedback) feedback.classList.add('hidden');
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy: ', err);
+      });
     }
 
     function changeStep(delta) {

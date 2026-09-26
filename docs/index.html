@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AWS Lab 1.1 - Launch & Bootstrap EC2 Interactive Explainer</title>
-  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <title>AWS EC2 Master Labs - Interactive Architecture & CLI Simulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="./labs_data.js"></script>
   <style>
     @keyframes pulse-glow {
       0%, 100% { opacity: 0.3; transform: scale(0.98); }
@@ -51,29 +52,68 @@
     }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4 md:p-6 antialiased">
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-3 md:p-6 antialiased">
 
-  <!-- Header -->
+  <!-- Top Navigation & Global Header -->
   <div class="max-w-7xl mx-auto mb-6">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-      <div>
-        <div class="flex items-center gap-2 mb-1 flex-wrap">
-          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">AWS Lab 1.1</span>
-          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">EC2 & Graviton ARM64</span>
+      
+      <!-- Title and Breadcrumb Selector -->
+      <div class="space-y-1.5">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+            <span>☁️</span> AWS EC2 Labs Suite
+          </span>
+          <span id="moduleBadge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            Module 1
+          </span>
+          <span id="labBadge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            Lab 1.1
+          </span>
           <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span> Crimson Focus Active
           </span>
         </div>
-        <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-          <span>🚀 Launching & Bootstrapping EC2</span>
-          <span class="text-sm font-normal text-slate-400 font-mono hidden sm:inline">(Under-The-Hood Architecture Simulator)</span>
-        </h1>
+        
+        <div class="flex items-center gap-3 flex-wrap">
+          <h1 id="labMainTitle" class="text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            Loading Lab Simulator...
+          </h1>
+        </div>
       </div>
 
-      <!-- Controls & Speed Selector -->
-      <div class="flex items-center gap-3 flex-wrap">
+      <!-- Module & Lab Pickers + Quick Switcher -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="toggleModal(true)" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5 shadow-sm transition">
+          <span>📚</span> <span>All 28 Labs</span>
+        </button>
+
+        <!-- Module Selector -->
+        <select id="moduleSelect" onchange="onModuleChange(this.value)" class="bg-slate-900 border border-slate-700 text-xs font-medium rounded-xl px-3 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500">
+          <!-- Populated by JS -->
+        </select>
+
+        <!-- Lab Selector -->
+        <select id="labSelect" onchange="onLabChange(this.value)" class="bg-slate-900 border border-slate-700 text-xs font-medium rounded-xl px-3 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500 max-w-[220px]">
+          <!-- Populated by JS -->
+        </select>
+      </div>
+
+    </div>
+
+    <!-- Controls Bar: Speed & Playback -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80">
+      
+      <!-- Module description snippet -->
+      <div class="text-xs text-slate-400 flex items-center gap-2">
+        <span id="moduleIcon" class="text-base">🚀</span>
+        <span id="moduleDesc" class="font-mono text-[11px] truncate max-w-xl"></span>
+      </div>
+
+      <!-- Controls Group -->
+      <div class="flex items-center gap-3 flex-wrap justify-end">
         <!-- Speed Controls -->
-        <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs font-medium">
+        <div class="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1 text-xs font-medium">
           <span class="text-slate-400 px-2 text-[11px]">Speed:</span>
           <button id="speed05" onclick="setSpeed(6400, '0.5x')" class="px-2 py-1 rounded-lg bg-blue-600 text-white transition text-xs font-semibold">0.5x</button>
           <button id="speed10" onclick="setSpeed(3200, '1.0x')" class="px-2 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition text-xs font-semibold">1.0x</button>
@@ -81,26 +121,27 @@
         </div>
 
         <!-- Playback Controls -->
-        <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 p-1.5 rounded-xl shadow-lg">
-          <button id="prevBtn" onclick="changeStep(-1)" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+        <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-800 p-1.5 rounded-xl shadow-lg">
+          <button id="prevBtn" onclick="changeStep(-1)" class="px-3 py-1 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
             ◀ Prev
           </button>
-          <button id="playBtn" onclick="toggleAutoPlay()" class="px-4 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white transition flex items-center gap-1.5 shadow-md shadow-blue-600/20">
+          <button id="playBtn" onclick="toggleAutoPlay()" class="px-3.5 py-1 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white transition flex items-center gap-1.5 shadow-md shadow-blue-600/20">
             <span id="playIcon">▶</span> <span id="playText">Auto Play (0.5x)</span>
           </button>
-          <button id="nextBtn" onclick="changeStep(1)" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+          <button id="nextBtn" onclick="changeStep(1)" class="px-3 py-1 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
             Next ▶
           </button>
-          <button onclick="goToStep(0)" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition" title="Reset to step 1">
+          <button onclick="goToStep(0)" class="px-2 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition" title="Reset to step 1">
             ↺
           </button>
         </div>
       </div>
+
     </div>
 
-    <!-- Stepper Navigation -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mt-4" id="stepperContainer">
-      <!-- Generated via JS -->
+    <!-- Stepper Navigation (Responsive Step Grid) -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 mt-4" id="stepperContainer">
+      <!-- Dynamically generated by JS -->
     </div>
   </div>
 
@@ -119,7 +160,12 @@
             <div class="w-3 h-3 rounded-full bg-emerald-500/80"></div>
             <span class="text-xs font-mono text-slate-400 ml-2">bash ~ AWS CLI</span>
           </div>
-          <span id="stepBadge" class="text-xs font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/30">Step 1 of 7</span>
+          <div class="flex items-center gap-2">
+            <button id="toggleCmdView" onclick="toggleCommandDetail()" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 transition">
+              Clean CLI
+            </button>
+            <span id="stepBadge" class="text-xs font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/30">Step 1</span>
+          </div>
         </div>
 
         <div class="p-4">
@@ -132,7 +178,7 @@
             </div>
             <span id="copyFeedback" class="text-[10px] text-emerald-400 font-mono font-semibold hidden animate-pulse">✓ Copied!</span>
           </div>
-          <div class="bg-black/80 rounded-xl p-3 border border-slate-800/80 font-mono text-xs text-emerald-400 overflow-x-auto code-scroll relative group">
+          <div class="bg-black/80 rounded-xl p-3 border border-slate-800/80 font-mono text-xs text-emerald-400 overflow-x-auto code-scroll relative group max-h-[220px]">
             <pre id="commandBox" class="whitespace-pre-wrap leading-relaxed"></pre>
           </div>
         </div>
@@ -145,12 +191,12 @@
             <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
             <span>What This Command Does in AWS</span>
           </div>
-          <h2 id="stepTitle" class="text-lg font-bold text-white mb-2"></h2>
-          <p id="stepDescription" class="text-sm text-slate-300 leading-relaxed"></p>
+          <h2 id="stepTitle" class="text-base md:text-lg font-bold text-white mb-2 leading-snug"></h2>
+          <p id="stepDescription" class="text-xs md:text-sm text-slate-300 leading-relaxed"></p>
         </div>
 
         <!-- AWS Control Plane vs Data Plane Activity -->
-        <div class="bg-slate-950/60 rounded-xl p-3.5 border border-slate-800 space-y-2">
+        <div class="bg-slate-950/60 rounded-xl p-3.5 border border-slate-800 space-y-1.5">
           <div class="text-xs font-semibold text-amber-400 flex items-center gap-1.5">
             <span>⚙️ AWS Internal Mechanism:</span>
           </div>
@@ -158,8 +204,8 @@
         </div>
 
         <!-- Security / Architecture Tip -->
-        <div id="tipBox" class="bg-emerald-950/30 border border-emerald-800/40 rounded-xl p-3.5 text-xs text-emerald-200">
-          <span class="font-bold">💡 Best Practice / Security Insight: </span>
+        <div id="tipBox" class="bg-emerald-950/30 border border-emerald-800/40 rounded-xl p-3.5 text-xs text-emerald-200 leading-relaxed">
+          <span class="font-bold text-emerald-300">💡 Best Practice / Production Impact: </span>
           <span id="stepTip"></span>
         </div>
       </div>
@@ -167,13 +213,15 @@
     </div>
 
     <!-- Right Column: Interactive Animated AWS Architecture Canvas (7 Cols) -->
-    <div class="lg:col-span-7">
-      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl h-full flex flex-col justify-between">
+    <div class="lg:col-span-7 space-y-4">
+      
+      <!-- Canvas Card -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 md:p-5 shadow-xl flex flex-col justify-between">
 
         <!-- Canvas Header -->
         <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
           <div class="flex items-center gap-2">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">AWS Infrastructure State</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">AWS Infrastructure Topology</span>
             <span class="px-2 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">Region: us-east-1</span>
           </div>
           <div id="liveStatusPill" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
@@ -182,273 +230,710 @@
           </div>
         </div>
 
-        <!-- Visual Architecture Canvas -->
-        <div class="relative w-full min-h-[440px] bg-slate-950 rounded-xl border border-slate-800/80 p-4 overflow-hidden flex flex-col justify-between">
+        <!-- Visual Architecture Canvas (Dynamic SVG / Components) -->
+        <div id="canvasContainer" class="relative w-full min-h-[420px] bg-slate-950 rounded-xl border border-slate-800/80 p-4 overflow-hidden flex flex-col justify-between">
+          <!-- Dynamic Module Specific Canvas Loaded Here -->
+        </div>
 
-          <!-- Background Grid decoration -->
-          <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px]"></div>
-
-          <!-- Top Section: Client / DevOps Engineer & SSM Parameter Store -->
-          <div class="relative z-10 flex items-center justify-between gap-4">
-
-            <!-- DevOps Engineer Client -->
-            <div id="nodeClient" class="w-40 bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-lg transition-all duration-500">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-lg">👨‍💻</span>
-                <span class="text-xs font-bold text-slate-200">DevOps CLI</span>
-              </div>
-              <p class="text-[10px] text-slate-400 font-mono">Local Machine</p>
-              <div id="clientBadge" class="mt-1.5 text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">Idle</div>
-            </div>
-
-            <!-- AWS SSM Parameter Store / AMI Catalog -->
-            <div id="nodeSSM" class="w-48 bg-slate-900 border border-slate-800 rounded-xl p-3 opacity-40 transition-all duration-500">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-lg">📦</span>
-                <span class="text-xs font-bold text-amber-400">AWS SSM Parameter</span>
-              </div>
-              <p class="text-[10px] text-slate-400 font-mono">/aws/service/ami-al2023</p>
-              <div id="ssmBadge" class="mt-1.5 text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">ARM64 Graviton AMI</div>
-            </div>
-
+        <!-- Live Traffic / Packet Signal Flow description -->
+        <div class="mt-3 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+            <span class="text-slate-400">Active Packet / API Call:</span>
+            <span id="activePacketLabel" class="font-mono text-rose-300 text-xs">Initializing...</span>
           </div>
-
-          <!-- Mid Section: Default VPC & Internet Gateway & Subnet -->
-          <div id="nodeVPC" class="relative z-10 my-4 p-4 rounded-xl border border-indigo-500/30 bg-indigo-950/10 transition-all duration-500">
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-indigo-400">🌐 Default VPC</span>
-                <span class="text-[10px] font-mono text-slate-500">172.31.0.0/16</span>
-              </div>
-              <!-- Internet Gateway -->
-              <div id="nodeIGW" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 text-xs transition-all duration-500">
-                <span>🚪</span>
-                <span class="font-mono text-[11px]">IGW (Internet Gateway)</span>
-              </div>
-            </div>
-
-            <!-- Public Subnet Container -->
-            <div class="p-3.5 rounded-xl border border-blue-500/30 bg-blue-950/20">
-              <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-semibold text-blue-300">Public Subnet (us-east-1a)</span>
-                <span class="text-[10px] font-mono text-slate-500">172.31.32.0/20</span>
-              </div>
-
-              <!-- Inside Subnet: Security Group & EC2 & IMDSv2 -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
-
-                <!-- Security Group Boundary -->
-                <div id="nodeSG" class="bg-slate-900/90 border border-slate-700 rounded-xl p-3 transition-all duration-500 opacity-40">
-                  <div class="flex items-center justify-between mb-1.5">
-                    <span class="text-xs font-bold text-amber-300 flex items-center gap-1">
-                      <span>🛡️</span> Security Group
-                    </span>
-                    <span id="sgRuleCount" class="text-[10px] font-mono text-slate-400">0 Ingress</span>
-                  </div>
-                  <div id="sgRulesList" class="text-[10px] font-mono text-slate-400 bg-slate-950 p-2 rounded border border-slate-800">
-                    <div>Ingress: Deny all (default)</div>
-                    <div>Egress: Allow all (0.0.0.0/0)</div>
-                  </div>
-                </div>
-
-                <!-- EC2 Instance -->
-                <div id="nodeEC2" class="bg-slate-900/90 border-2 border-slate-800 rounded-xl p-3 transition-all duration-500 opacity-40 relative">
-                  <div class="flex items-center justify-between mb-1">
-                    <div class="flex items-center gap-1.5">
-                      <span class="text-lg">🖥️</span>
-                      <span class="text-xs font-bold text-emerald-400">EC2 Instance</span>
-                    </div>
-                    <span id="ec2State" class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">Not Created</span>
-                  </div>
-
-                  <div class="space-y-1 text-[10px] font-mono text-slate-300 mt-2">
-                    <div class="flex justify-between"><span class="text-slate-500">Type:</span> <span id="ec2Type" class="text-slate-400">--</span></div>
-                    <div class="flex justify-between"><span class="text-slate-500">Arch:</span> <span id="ec2Arch" class="text-slate-400">--</span></div>
-                    <div class="flex justify-between"><span class="text-slate-500">Public IP:</span> <span id="ec2IP" class="text-slate-400">--</span></div>
-                    <div class="flex justify-between"><span class="text-slate-500">Web Service:</span> <span id="ec2Nginx" class="text-slate-400">Offline</span></div>
-                  </div>
-
-                  <!-- Bootstrap Overlay Indicator -->
-                  <div id="bootstrapBadge" class="hidden mt-2 p-1.5 rounded bg-blue-950/80 border border-blue-500/40 text-[10px] text-blue-200 text-center font-mono">
-                    ⚙️ cloud-init running user-data...
-                  </div>
-                </div>
-
-              </div>
-
-              <!-- Instance Metadata Service (IMDSv2) -->
-              <div id="nodeIMDS" class="mt-3 bg-slate-950/90 border border-slate-800 rounded-lg p-2 flex items-center justify-between text-xs opacity-40 transition-all duration-500">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm">🔑</span>
-                  <div>
-                    <span class="font-bold text-slate-300 text-[11px]">IMDSv2 Local Link</span>
-                    <span class="text-[10px] font-mono text-slate-500 ml-1.5">http://169.254.169.254</span>
-                  </div>
-                </div>
-                <span id="imdsBadge" class="text-[9px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400">HttpTokens=required (TTL: 60s)</span>
-              </div>
-
-            </div>
-          </div>
-
-          <!-- Bottom: Live Traffic / Animation Packet Flow description -->
-          <div class="relative z-10 bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
-            <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-              <span class="text-slate-400">Active Packet / API Call:</span>
-              <span id="activePacketLabel" class="font-mono text-rose-300 text-xs">Awaiting command start...</span>
-            </div>
-            <div id="packetSpeedBadge" class="text-[10px] text-slate-500 font-mono">0.5x Speed (6.4s / step)</div>
-          </div>
-
+          <div id="packetSpeedBadge" class="text-[10px] text-slate-500 font-mono">0.5x Speed (6.4s / step)</div>
         </div>
 
       </div>
+
+      <!-- Live State & Architecture Inspector Card -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
+        <div class="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <span>📊</span> <span>Live State & Resource Inspector</span>
+          </div>
+          <span class="text-[10px] font-mono text-emerald-400">● Synchronized</span>
+        </div>
+        <div id="inspectorGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
     </div>
 
   </div>
 
+  <!-- Modal: 28 Labs Full Suite Directory -->
+  <div id="suiteModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">📚</span>
+          <h3 class="text-base font-bold text-white">AWS EC2 Interactive Simulator Directory (28 Labs)</h3>
+        </div>
+        <button onclick="toggleModal(false)" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          ✕
+        </button>
+      </div>
+      <div class="p-4 overflow-y-auto space-y-6 flex-1 code-scroll" id="modalLabsList">
+        <!-- Rendered by JS -->
+      </div>
+      <div class="p-3 border-t border-slate-800 bg-slate-950 flex justify-between items-center text-xs text-slate-400">
+        <span>Hosted via GitHub Pages • Direct URL Deep-linking Supported</span>
+        <button onclick="toggleModal(false)" class="px-3 py-1 rounded-lg bg-blue-600 text-white font-semibold">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    const steps = [
-      {
-        id: 1,
-        shortTitle: "1. Discover VPC",
-        title: "Discover Default VPC and Public Subnet",
-        command: "aws ec2 describe-vpcs --filters \"Name=isDefault,Values=true\"\naws ec2 describe-subnets --filters \"Name=vpc-id,Values=$DEFAULT_VPC_ID\"",
-        description: "Queries the AWS EC2 regional control plane to inspect the account's pre-configured Default VPC and list its associated subnets across Availability Zones.",
-        internal: "API: DescribeVpcs & DescribeSubnets → AWS Control Plane checks IAM permissions and returns VPC metadata, CIDR block (172.31.0.0/16), and Subnet IDs.",
-        tip: "Default VPCs come pre-attached with an Internet Gateway (IGW) and public IP auto-assign enabled, making them ideal for quick lab experiments.",
-        status: "VPC & Subnet Discovered",
-        statusColor: "bg-blue-500",
-        activePacket: "CLI → AWS Control Plane: DescribeVpcs (Read-only API)",
-        stateUpdate: {
-          client: "Querying AWS Control Plane",
-          ssm: "dormant",
-          sg: "unconfigured",
-          ec2: "none",
-          imds: "dormant"
+    // Global State
+    let currentLabIndex = 0;
+    let currentStepIndex = 0;
+    let autoPlayTimer = null;
+    let playSpeed = 6400; // Default: 0.5x speed
+    let speedLabel = '0.5x';
+    let showDetailedCommand = false;
+
+    // Canvas template generators by architecture type
+    const canvasTemplates = {
+      compute_lifecycle: () => `
+        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        
+        <!-- Top Section -->
+        <div class="relative z-10 flex items-center justify-between gap-4">
+          <div id="nodeClient" class="w-40 bg-slate-900 border border-slate-700 rounded-xl p-2.5 shadow-lg transition-all duration-500">
+            <div class="flex items-center gap-1.5 mb-1">
+              <span class="text-base">👨‍💻</span>
+              <span class="text-xs font-bold text-slate-200">DevOps CLI</span>
+            </div>
+            <p class="text-[9px] text-slate-400 font-mono">Local Workstation</p>
+            <div id="badgeClient" class="mt-1 text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">Ready</div>
+          </div>
+
+          <div id="nodeSSM" class="w-44 bg-slate-900 border border-slate-800 rounded-xl p-2.5 opacity-60 transition-all duration-500">
+            <div class="flex items-center gap-1.5 mb-1">
+              <span class="text-base">📦</span>
+              <span class="text-xs font-bold text-amber-400">SSM Parameter / AMI</span>
+            </div>
+            <p class="text-[9px] text-slate-400 font-mono">/aws/service/ami-al2023</p>
+            <div id="badgeSSM" class="mt-1 text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">ARM64 Graviton</div>
+          </div>
+        </div>
+
+        <!-- Mid VPC Container -->
+        <div id="nodeVPC" class="relative z-10 my-3 p-3.5 rounded-xl border border-indigo-500/30 bg-indigo-950/10 transition-all duration-500">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-indigo-400">🌐 VPC (172.31.0.0/16)</span>
+            </div>
+            <div id="nodeIGW" class="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 text-[10px] transition-all">
+              <span>🚪</span> <span class="font-mono">Internet Gateway</span>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-xl border border-blue-500/30 bg-blue-950/20">
+            <div class="text-[10px] font-mono text-blue-300 mb-2">Public Subnet (us-east-1a) • 172.31.32.0/20</div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
+              <div id="nodeSG" class="bg-slate-900/90 border border-slate-700 rounded-xl p-2.5 transition-all duration-500">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold text-amber-300 flex items-center gap-1">🛡️ Security Group</span>
+                  <span id="badgeSG" class="text-[9px] font-mono text-slate-400">Stateful Firewall</span>
+                </div>
+                <div class="text-[9px] font-mono text-slate-400 bg-slate-950 p-1.5 rounded border border-slate-800" id="sgRulesBox">
+                  <div>Ingress: Port 80 / Port 22</div>
+                  <div>Egress: 0.0.0.0/0 (All)</div>
+                </div>
+              </div>
+
+              <div id="nodeEC2" class="bg-slate-900/90 border-2 border-slate-800 rounded-xl p-2.5 transition-all duration-500 relative">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold text-emerald-400 flex items-center gap-1">🖥️ EC2 Instance</span>
+                  <span id="badgeEC2" class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300">running</span>
+                </div>
+                <div class="text-[9px] font-mono text-slate-300 space-y-0.5">
+                  <div class="flex justify-between"><span>Arch:</span> <span id="valArch" class="text-slate-400">ARM64 / x86</span></div>
+                  <div class="flex justify-between"><span>Lifecycle:</span> <span id="valState" class="text-slate-400">Active</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- IMDSv2 & Storage Swap -->
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <div id="nodeIMDS" class="bg-slate-950/90 border border-slate-800 rounded-lg p-1.5 flex items-center justify-between text-[10px] transition-all">
+                <span class="text-slate-300">🔑 IMDSv2 Token: Enforced</span>
+                <span class="text-slate-500 font-mono">169.254.169.254</span>
+              </div>
+              <div id="nodeStorage" class="bg-slate-950/90 border border-slate-800 rounded-lg p-1.5 flex items-center justify-between text-[10px] transition-all">
+                <span class="text-slate-300">💾 EBS Root (Swap/Hibernate)</span>
+                <span class="text-amber-400 font-mono">Encrypted KMS</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      `,
+
+      storage_volumes: () => `
+        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        
+        <div class="relative z-10 flex items-center justify-between mb-3">
+          <div id="nodeEC2" class="w-1/2 bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-lg transition-all duration-500">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-amber-400 flex items-center gap-1.5">🖥️ EC2 Compute Host</span>
+              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-950 text-blue-300">Nitro NVMe</span>
+            </div>
+            <div class="text-[10px] font-mono text-slate-400 space-y-0.5">
+              <div>OS Kernel: Linux 6.1 (XFS / ext4)</div>
+              <div>Block Devices: /dev/nvme0n1, /dev/nvme1n1</div>
+            </div>
+          </div>
+
+          <div id="nodeClient" class="w-40 bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-right transition-all">
+            <div class="text-xs font-bold text-slate-300">CLI & DLM Agent</div>
+            <div class="text-[9px] font-mono text-emerald-400 mt-1">Snapshot Automation</div>
+          </div>
+        </div>
+
+        <!-- Storage Topology Grid -->
+        <div class="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-2.5 my-2">
+          
+          <div id="nodeStorage" class="bg-slate-900/90 border border-slate-700 rounded-xl p-3 transition-all duration-500">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-amber-300">💾 EBS gp3 Volume</span>
+              <span class="text-[9px] font-mono text-emerald-400">Online Expand</span>
+            </div>
+            <div class="text-[9px] font-mono text-slate-400 space-y-1 mt-1 bg-slate-950 p-2 rounded border border-slate-800">
+              <div>Type: gp3 (Elastic)</div>
+              <div>IOPS: 3,000 baseline</div>
+              <div>Throughput: 125 MB/s</div>
+            </div>
+          </div>
+
+          <div id="nodeEFS" class="bg-slate-900/90 border border-slate-700 rounded-xl p-3 transition-all duration-500">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-cyan-300">📂 EFS File System</span>
+              <span class="text-[9px] font-mono text-cyan-400">NFSv4 (Port 2049)</span>
+            </div>
+            <div class="text-[9px] font-mono text-slate-400 space-y-1 mt-1 bg-slate-950 p-2 rounded border border-slate-800">
+              <div>Shared POSIX Locking</div>
+              <div>Multi-AZ Mount Targets</div>
+              <div>Auto-Scales PB Capacity</div>
+            </div>
+          </div>
+
+          <div id="nodeNitro" class="bg-slate-900/90 border border-slate-700 rounded-xl p-3 transition-all duration-500">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-rose-300">⚡ NVMe Ephemeral</span>
+              <span class="text-[9px] font-mono text-rose-400">Instance Store</span>
+            </div>
+            <div class="text-[9px] font-mono text-slate-400 space-y-1 mt-1 bg-slate-950 p-2 rounded border border-slate-800">
+              <div>Sub-millisecond Latency</div>
+              <div>Direct Host PCIe bus</div>
+              <div>Volatile (Erased on stop)</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="relative z-10 bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-[10px] font-mono">
+          <span class="text-slate-400">Snapshot S3 Repository: Persistent block deltas</span>
+          <span class="text-emerald-400">DLM Daily Schedule: Active</span>
+        </div>
+      `,
+
+      networking_eni: () => `
+        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#06b6d4_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        
+        <div class="relative z-10 flex items-center justify-between mb-2">
+          <div id="nodeVPC" class="text-xs font-bold text-cyan-400">🌐 VPC (10.0.0.0/16)</div>
+          <div id="nodeEIP" class="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/40 text-[10px] font-mono">Elastic IP: 54.210.88.14</div>
+        </div>
+
+        <div class="relative z-10 grid grid-cols-2 gap-3 my-2">
+          
+          <!-- Subnet 1: Public -->
+          <div class="bg-slate-900/80 border border-blue-500/40 rounded-xl p-2.5">
+            <div class="text-[10px] font-bold text-blue-300 mb-1">Public Subnet (10.0.1.0/24)</div>
+            <div id="nodeENI" class="bg-slate-950 p-2 rounded-lg border border-slate-800 text-[9px] font-mono text-slate-300 space-y-0.5">
+              <div class="text-emerald-400 font-bold">Primary ENI (eth0)</div>
+              <div>IP: 10.0.1.50 • Default GW</div>
+              <div>Source/Dest Check: Enabled</div>
+            </div>
+          </div>
+
+          <!-- Subnet 2: Management -->
+          <div class="bg-slate-900/80 border border-purple-500/40 rounded-xl p-2.5">
+            <div class="text-[10px] font-bold text-purple-300 mb-1">Management Subnet (10.0.2.0/24)</div>
+            <div id="nodeSG" class="bg-slate-950 p-2 rounded-lg border border-slate-800 text-[9px] font-mono text-slate-300 space-y-0.5">
+              <div class="text-purple-400 font-bold">Secondary ENI (eth1)</div>
+              <div>IP: 10.0.2.75 • Policy Route</div>
+              <div>Table 100: ip rule add</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div id="nodeEC2" class="relative z-10 bg-slate-900 border border-slate-700 rounded-xl p-3 my-2 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🖥️</span>
+            <div>
+              <div class="text-xs font-bold text-slate-200">Dual-Homed EC2 Instance</div>
+              <div class="text-[9px] font-mono text-slate-400">ENA Express (SRD) • Placement Group: Cluster / Spread</div>
+            </div>
+          </div>
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300">Active Routing</span>
+        </div>
+      `,
+
+      security_iam: () => `
+        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        
+        <div class="relative z-10 flex items-center justify-between mb-2">
+          <div id="nodeClient" class="w-40 bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs font-bold text-slate-300">
+            DevOps Admin (SSM)
+          </div>
+          <div id="nodeSSM" class="px-2.5 py-1 rounded-xl bg-slate-900 border border-emerald-500/50 text-emerald-300 text-[10px] font-mono">
+            SSM Session Manager (Zero-SSH Port 443)
+          </div>
+        </div>
+
+        <!-- Security Flow Grid -->
+        <div class="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3 my-2">
+          
+          <div id="nodeSG" class="bg-slate-900/90 border border-slate-700 rounded-xl p-2.5">
+            <div class="text-xs font-bold text-amber-300 mb-1">Stateless NACL vs Stateful SG</div>
+            <div class="bg-slate-950 p-2 rounded border border-slate-800 text-[9px] font-mono text-slate-400 space-y-1">
+              <div class="text-emerald-400">✓ Ingress Rule: Match State Table</div>
+              <div>✓ Ephemeral Return: Auto-Allowed</div>
+              <div class="text-rose-400">✕ NACL: Explicit In/Out Required</div>
+            </div>
+          </div>
+
+          <div id="nodeIAM" class="bg-slate-900/90 border border-slate-700 rounded-xl p-2.5">
+            <div class="text-xs font-bold text-emerald-300 mb-1">IAM Instance Profile & STS</div>
+            <div class="bg-slate-950 p-2 rounded border border-slate-800 text-[9px] font-mono text-slate-400 space-y-1">
+              <div>Role: EC2SSMManagedRole</div>
+              <div class="text-blue-300">STS Token Rotation (Auto 6h)</div>
+              <div>Zero Hardcoded Secrets</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- EC2 with IMDSv2 Hardening -->
+        <div id="nodeEC2" class="relative z-10 bg-slate-900 border border-slate-700 rounded-xl p-3 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🛡️</span>
+            <div>
+              <div class="text-xs font-bold text-slate-200">Hardened EC2 Guest OS</div>
+              <div class="text-[9px] font-mono text-slate-400">IMDSv2 Enforced • HopLimit=1 (SSRF Neutralized)</div>
+            </div>
+          </div>
+          <div id="nodeIMDS" class="text-[9px] font-mono px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-500/30">
+            HttpTokens=required
+          </div>
+        </div>
+      `,
+
+      ha_asg: () => `
+        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        
+        <div class="relative z-10 flex items-center justify-between mb-2">
+          <div id="nodeClient" class="text-xs font-bold text-slate-300">🌐 Internet User Traffic</div>
+          <div id="nodeALB" class="bg-slate-900 border border-indigo-500/50 rounded-xl px-3 py-1.5 text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+            <span>⚖️</span> Application Load Balancer (ALB)
+          </div>
+        </div>
+
+        <!-- Target Group & ASG Box -->
+        <div id="nodeASG" class="relative z-10 my-2 bg-slate-900/90 border border-indigo-500/30 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-xs font-bold text-indigo-300">Auto Scaling Group (ASG) • Target Tracking (CPU 50%)</div>
+            <div class="text-[9px] font-mono text-emerald-400">Min: 2 | Desired: 2 | Max: 6</div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div id="nodeEC2" class="bg-slate-950 p-2 rounded-lg border border-slate-800 text-[9px] font-mono text-slate-300">
+              <div class="text-emerald-400 font-bold">Instance 1 (AZ-1a)</div>
+              <div>Health: InService (200 OK)</div>
+              <div>Launch Template: v2</div>
+            </div>
+            <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 text-[9px] font-mono text-slate-300">
+              <div class="text-emerald-400 font-bold">Instance 2 (AZ-1b)</div>
+              <div>Health: InService (200 OK)</div>
+              <div>Launch Template: v2</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="nodeSG" class="relative z-10 bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-[10px] font-mono">
+          <span class="text-slate-400">Lifecycle Hook: EC2_INSTANCE_TERMINATING (Heartbeat: 300s)</span>
+          <span class="text-amber-400">Connection Draining: 30s</span>
+        </div>
+      `,
+
+      spot_cost: () => `
+        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#f43f5e_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        
+        <div class="relative z-10 flex items-center justify-between mb-2">
+          <div id="nodeSpot" class="bg-slate-900 border border-rose-500/40 rounded-xl px-3 py-1 text-xs font-bold text-rose-300">
+            💰 AWS Spot Capacity Pool (Up to 90% Savings)
+          </div>
+          <div class="text-[10px] font-mono text-slate-400">Mixed Instances Allocation</div>
+        </div>
+
+        <div id="nodeASG" class="relative z-10 grid grid-cols-3 gap-2 my-2">
+          <div class="bg-slate-900/90 border border-slate-700 rounded-xl p-2 text-[9px] font-mono">
+            <div class="text-blue-400 font-bold">On-Demand Base (20%)</div>
+            <div class="text-slate-400 mt-1">t3.micro (Guaranteed)</div>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-700 rounded-xl p-2 text-[9px] font-mono">
+            <div class="text-rose-400 font-bold">Spot Pool 1 (40%)</div>
+            <div class="text-slate-400 mt-1">t4g.micro (Graviton)</div>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-700 rounded-xl p-2 text-[9px] font-mono">
+            <div class="text-amber-400 font-bold">Spot Pool 2 (40%)</div>
+            <div class="text-slate-400 mt-1">c5.large (Compute)</div>
+          </div>
+        </div>
+
+        <div id="nodeEC2" class="relative z-10 bg-slate-900 border border-slate-700 rounded-xl p-3 my-2 flex items-center justify-between">
+          <div>
+            <div class="text-xs font-bold text-slate-200">Spot Interruption Handler (2-Minute Warning)</div>
+            <div class="text-[9px] font-mono text-slate-400">EventBridge / Instance Metadata Rebalance Recommendation</div>
+          </div>
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300">Graceful Drain</span>
+        </div>
+
+        <div id="nodeStorage" class="relative z-10 bg-slate-950 p-2 rounded-xl border border-slate-800 text-[10px] font-mono text-slate-400 flex justify-between">
+          <span>Rightsizing: gp2 to gp3 (+20% cost reduction)</span>
+          <span class="text-emerald-400">Verified</span>
+        </div>
+      `,
+
+      monitoring_ops: () => `
+        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        
+        <div class="relative z-10 flex items-center justify-between mb-2">
+          <div id="nodeCloudWatch" class="bg-slate-900 border border-violet-500/50 rounded-xl px-3 py-1.5 text-xs font-bold text-violet-300">
+            📊 Amazon CloudWatch Metrics & Alarms
+          </div>
+          <div id="nodeFlowLogs" class="text-[10px] font-mono text-slate-400">VPC Flow Logs Forensics</div>
+        </div>
+
+        <div class="relative z-10 grid grid-cols-2 gap-3 my-2">
+          
+          <div id="nodeEC2" class="bg-slate-900/90 border border-slate-700 rounded-xl p-2.5">
+            <div class="text-xs font-bold text-emerald-300 mb-1">Dual Status Checks</div>
+            <div class="bg-slate-950 p-2 rounded border border-slate-800 text-[9px] font-mono text-slate-400 space-y-1">
+              <div>✓ System Check: 2/2 Passed</div>
+              <div>✓ Instance Check: 2/2 Passed</div>
+              <div class="text-blue-400">⚡ Auto-Recovery: Enabled</div>
+            </div>
+          </div>
+
+          <div id="nodeSSM" class="bg-slate-900/90 border border-slate-700 rounded-xl p-2.5">
+            <div class="text-xs font-bold text-amber-300 mb-1">Unified Agent & Serial Rescue</div>
+            <div class="bg-slate-950 p-2 rounded border border-slate-800 text-[9px] font-mono text-slate-400 space-y-1">
+              <div>Metrics: mem_used_percent, disk_used</div>
+              <div>Logs: /var/log/messages</div>
+              <div class="text-emerald-400">Rescue Volume: /dev/xvdf</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div id="nodeStorage" class="relative z-10 bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-[10px] font-mono">
+          <span class="text-slate-400">CloudWatch Auto-Recovery: Migrates to new host preserving IP/EBS</span>
+          <span class="text-emerald-400">Zero Loss</span>
+        </div>
+      `,
+
+      nitro_enclaves: () => `
+        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#d946ef_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        
+        <div class="relative z-10 flex items-center justify-between mb-2">
+          <div id="nodeNitro" class="bg-slate-900 border border-fuchsia-500/40 rounded-xl px-3 py-1.5 text-xs font-bold text-fuchsia-300">
+            ⚡ AWS Nitro System (Dedicated Hardware PCIe Cards)
+          </div>
+          <div class="text-[10px] font-mono text-slate-400">Nitro Hypervisor (Core Isolation)</div>
+        </div>
+
+        <!-- Enclave Isolation Split -->
+        <div class="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3 my-2">
+          
+          <div id="nodeEC2" class="bg-slate-900/90 border border-slate-700 rounded-xl p-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-blue-300">🖥️ Primary Parent EC2</span>
+              <span class="text-[9px] font-mono text-blue-400">Nitro Card Attached</span>
+            </div>
+            <div class="text-[9px] font-mono text-slate-400 space-y-0.5 mt-1 bg-slate-950 p-2 rounded border border-slate-800">
+              <div>Network: Nitro VPC Card</div>
+              <div>Storage: Nitro EBS NVMe</div>
+              <div>CLI: nitro-cli installed</div>
+            </div>
+          </div>
+
+          <div id="nodeEnclave" class="bg-slate-900/90 border-2 border-fuchsia-500/60 rounded-xl p-3 shadow-lg shadow-fuchsia-500/10">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-fuchsia-300">🔒 Nitro Enclave (Sealed)</span>
+              <span class="text-[9px] font-mono text-emerald-400">KMS Attestation</span>
+            </div>
+            <div class="text-[9px] font-mono text-slate-300 space-y-0.5 mt-1 bg-slate-950 p-2 rounded border border-slate-800">
+              <div>NO Persistent Storage / NO External IP</div>
+              <div>Dedicated vCPUs & Memory Allocation</div>
+              <div class="text-fuchsia-300">Cryptographic PCR Measurement</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="relative z-10 bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-[10px] font-mono">
+          <span class="text-slate-400">Secure Inter-Process Channel: VSOCK Socket (CID: 16, Port: 5000)</span>
+          <span class="text-emerald-400">Attestation Validated</span>
+        </div>
+      `
+    };
+
+    function init() {
+      populateModuleSelector();
+      parseUrlParams();
+      loadLabByGlobalIndex(currentLabIndex);
+      renderModalDirectory();
+    }
+
+    function populateModuleSelector() {
+      const moduleSelect = document.getElementById('moduleSelect');
+      const uniqueModules = [];
+      const seen = new Set();
+      
+      LABS_DATA.forEach(lab => {
+        if (!seen.has(lab.moduleNum)) {
+          seen.add(lab.moduleNum);
+          uniqueModules.push({ num: lab.moduleNum, name: lab.moduleName, icon: lab.moduleIcon });
         }
-      },
-      {
-        id: 2,
-        shortTitle: "2. Security Group",
-        title: "Create Security Group & Allow Port 80 Ingress",
-        command: "aws ec2 create-security-group \\\n  --group-name WebServerSG \\\n  --description \"Allow HTTP ingress\" \\\n  --vpc-id $DEFAULT_VPC_ID\n\naws ec2 authorize-security-group-ingress \\\n  --group-id $SG_ID \\\n  --protocol tcp \\\n  --port 80 \\\n  --cidr 0.0.0.0/0",
-        description: "Creates a stateful virtual firewall (Security Group) in the VPC and injects an inbound rule allowing HTTP traffic on port 80 from anywhere (0.0.0.0/0).",
-        internal: "API: CreateSecurityGroup & AuthorizeSecurityGroupIngress → AWS updates the VPC hypervisor state table. All inbound traffic is denied by default until explicitly permitted.",
-        tip: "Security Groups are stateful: Return traffic for allowed inbound requests is automatically allowed out, regardless of outbound rules.",
-        status: "SG Configured (Port 80 Allowed)",
-        statusColor: "bg-amber-500",
-        activePacket: "CLI → AWS VPC Firewall: Injected rule (TCP/80 Allow)",
-        stateUpdate: {
-          client: "Authorizing Security Group",
-          ssm: "dormant",
-          sg: "active",
-          ec2: "none",
-          imds: "dormant"
-        }
-      },
-      {
-        id: 3,
-        shortTitle: "3. AMI Lookup",
-        title: "Query Latest Graviton ARM64 AMI via SSM",
-        command: "aws ssm get-parameter \\\n  --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \\\n  --query \"Parameter.Value\" \\\n  --output text",
-        description: "Programmatically fetches the official Amazon Linux 2023 ARM64 AMI ID from the AWS Systems Manager Parameter Store public hierarchy.",
-        internal: "API: ssm:GetParameter → Resolves alias to AMI (e.g. ami-0c2b8ca1dad447f8a) compiled specifically for AWS Graviton (aarch64 / ARM64).",
-        tip: "AWS Graviton (ARM64) instances (like t4g.micro) deliver up to 40% better price/performance over comparable x86_64 instances.",
-        status: "ARM64 AMI Resolved",
-        statusColor: "bg-amber-400",
-        activePacket: "CLI → AWS SSM Parameter Store: Resolved AL2023 ARM64 AMI",
-        stateUpdate: {
-          client: "Fetching AMI ID",
-          ssm: "active",
-          sg: "active",
-          ec2: "none",
-          imds: "dormant"
-        }
-      },
-      {
-        id: 4,
-        shortTitle: "4. Launch EC2",
-        title: "Launch t4g.micro with User-Data & IMDSv2 Enforced",
-        command: "aws ec2 run-instances \\\n  --image-id $ARM64_AMI \\\n  --instance-type t4g.micro \\\n  --security-group-ids $SG_ID \\\n  --user-data file://user-data.sh \\\n  --metadata-options \"HttpTokens=required,HttpPutResponseHopLimit=1\" \\\n  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Graviton-WebServer}]'",
-        description: "Provisions the EC2 virtual machine on AWS Nitro hardware with Graviton2 CPU, attaches an Elastic Network Interface (ENI), assigns a public IP, and injects user-data.",
-        internal: "API: RunInstances → Nitro Hypervisor allocates vCPUs & memory, provisions EBS root volume, attaches ENI, and enforces IMDSv2 token requirement.",
-        tip: "Enforcing 'HttpTokens=required' (IMDSv2) protects against Server-Side Request Forgery (SSRF) metadata exfiltration attacks.",
-        status: "EC2 State: Initializing",
-        statusColor: "bg-blue-400",
-        activePacket: "Control Plane → Hypervisor: Allocating Nitro Hardware & ENI",
-        stateUpdate: {
-          client: "RunInstances Executed",
-          ssm: "dormant",
-          sg: "active",
-          ec2: "initializing",
-          imds: "enforced"
-        }
-      },
-      {
-        id: 5,
-        shortTitle: "5. Bootstrapping",
-        title: "cloud-init Executes User-Data & IMDSv2 Token Request",
-        command: "# Executing automatically inside EC2 as root on boot:\ndnf update -y && dnf install -y nginx\n\n# Secure IMDSv2 Token Retrieval:\nTOKEN=$(curl -s -X PUT \"http://169.254.169.254/latest/api/token\" \\\n  -H \"X-aws-ec2-metadata-token-ttl-seconds: 60\")\n\nINSTANCE_ID=$(curl -s -H \"X-aws-ec2-metadata-token: $TOKEN\" \\\n  http://169.254.169.254/latest/meta-data/instance-id)\n\nsystemctl enable --now nginx",
-        description: "The instance boots. The cloud-init daemon executes the user-data script as root: installs Nginx, requests a signed session token from IMDSv2 (169.254.169.254), queries instance metadata, and starts Nginx.",
-        internal: "Data Plane: EC2 local link request to 169.254.169.254 validates TTL hop limit and header, returns 60s temporary session token. Nginx starts on port 80.",
-        tip: "User-data runs only ONCE during the first launch lifecycle. Logs are captured in /var/log/cloud-init-output.log.",
-        status: "Bootstrapping & IMDSv2 Token Validated",
-        statusColor: "bg-emerald-400",
-        activePacket: "EC2 ↔ IMDSv2 (169.254.169.254): PUT Token Request & GET Metadata",
-        stateUpdate: {
-          client: "Waiting for boot",
-          ssm: "dormant",
-          sg: "active",
-          ec2: "bootstrapping",
-          imds: "active"
-        }
-      },
-      {
-        id: 6,
-        shortTitle: "6. Verify Web",
-        title: "Test Inbound Web Server Traffic via Public IP",
-        command: "PUBLIC_IP=$(aws ec2 describe-instances \\\n  --instance-ids $INSTANCE_ID \\\n  --query \"Reservations[0].Instances[0].PublicIpAddress\" \\\n  --output text)\n\ncurl -i http://$PUBLIC_IP",
-        description: "HTTP GET request flows from the client over the Internet, passes through the Internet Gateway (IGW), gets evaluated by the Security Group firewall on port 80, and is served by Nginx.",
-        internal: "Network Flow: Client → IGW → Subnet Route Table → Security Group (Stateful Match: Allow port 80) → ENI → Nginx Web Server (HTTP 200 OK returned).",
-        tip: "Because the Security Group is stateful, the return packets from Nginx back to the client are permitted automatically without opening outbound ephemeral ports.",
-        status: "HTTP 200 OK (Traffic Flowing)",
-        statusColor: "bg-emerald-500",
-        activePacket: "Client → IGW → SG (Port 80) → EC2: HTTP GET / → 200 OK",
-        stateUpdate: {
-          client: "HTTP 200 OK Received",
-          ssm: "dormant",
-          sg: "active",
-          ec2: "running_healthy",
-          imds: "enforced"
-        }
-      },
-      {
-        id: 7,
-        shortTitle: "7. Teardown",
-        title: "Lab Cleanup & Resource Termination",
-        command: "aws ec2 terminate-instances --instance-ids $INSTANCE_ID\n\n# Wait for instance termination before deleting SG:\naws ec2 wait instance-terminated --instance-ids $INSTANCE_ID\naws ec2 delete-security-group --group-id $SG_ID",
-        description: "Terminates the EC2 instance, releases the public IP and ENI, deallocates EBS storage, and deletes the custom Security Group to ensure zero leftover costs.",
-        internal: "API: TerminateInstances → Hypervisor flushes cache, unmounts and deletes root EBS volume, deallocates ENI and releases public IP back to AWS pool.",
-        tip: "Always clean up lab resources to prevent unintended AWS charges. Deleting an attached Security Group will fail until the instance is fully terminated.",
-        status: "Cleaned Up (0 Active Resources)",
-        statusColor: "bg-slate-500",
-        activePacket: "CLI → Control Plane: Terminating instance & releasing ENI",
-        stateUpdate: {
-          client: "Cleanup Completed",
-          ssm: "dormant",
-          sg: "deleted",
-          ec2: "terminated",
-          imds: "dormant"
+      });
+
+      moduleSelect.innerHTML = uniqueModules.map(m => 
+        `<option value="${m.num}">${m.icon} Module ${m.num}: ${m.name}</option>`
+      ).join('');
+    }
+
+    function updateLabSelector(moduleNum) {
+      const labSelect = document.getElementById('labSelect');
+      const labsInModule = LABS_DATA.filter(l => l.moduleNum === moduleNum);
+      
+      labSelect.innerHTML = labsInModule.map((l, idx) => 
+        `<option value="${l.id}">Lab ${l.labCode}: ${l.title}</option>`
+      ).join('');
+    }
+
+    function onModuleChange(moduleNum) {
+      const targetModuleNum = parseInt(moduleNum);
+      const firstLabIndex = LABS_DATA.findIndex(l => l.moduleNum === targetModuleNum);
+      if (firstLabIndex !== -1) {
+        currentLabIndex = firstLabIndex;
+        currentStepIndex = 0;
+        loadLabByGlobalIndex(currentLabIndex);
+      }
+    }
+
+    function onLabChange(labId) {
+      const labIndex = LABS_DATA.findIndex(l => l.id === labId);
+      if (labIndex !== -1) {
+        currentLabIndex = labIndex;
+        currentStepIndex = 0;
+        loadLabByGlobalIndex(currentLabIndex);
+      }
+    }
+
+    function loadLabByGlobalIndex(globalIdx) {
+      if (autoPlayTimer) {
+        clearInterval(autoPlayTimer);
+        autoPlayTimer = null;
+        document.getElementById('playIcon').innerText = '▶';
+        document.getElementById('playText').innerText = `Auto Play (${speedLabel})`;
+      }
+
+      currentLabIndex = globalIdx;
+      const lab = LABS_DATA[currentLabIndex];
+
+      document.getElementById('moduleSelect').value = lab.moduleNum;
+      updateLabSelector(lab.moduleNum);
+      document.getElementById('labSelect').value = lab.id;
+
+      document.getElementById('moduleBadge').innerText = `Module ${lab.moduleNum}`;
+      document.getElementById('labBadge').innerText = `Lab ${lab.labCode}`;
+      document.getElementById('labMainTitle').innerText = `🚀 ${lab.title}`;
+      document.getElementById('moduleIcon').innerText = lab.moduleIcon;
+      document.getElementById('moduleDesc').innerText = lab.moduleDesc;
+
+      // Update URL hash for deep linking
+      history.replaceState(null, '', `?lab=${lab.id}#step-${currentStepIndex + 1}`);
+
+      // Load specific architecture canvas
+      const container = document.getElementById('canvasContainer');
+      const templateFunc = canvasTemplates[lab.architectureType] || canvasTemplates.compute_lifecycle;
+      container.innerHTML = templateFunc();
+
+      renderSteppers();
+      updateView();
+    }
+
+    function parseUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      const labQuery = params.get('lab');
+      const moduleQuery = params.get('module');
+
+      if (labQuery) {
+        const found = LABS_DATA.findIndex(l => l.id === labQuery || l.labCode === labQuery);
+        if (found !== -1) {
+          currentLabIndex = found;
+          return;
         }
       }
-    ];
 
-    let currentStep = 0;
-    let autoPlayTimer = null;
-    let playSpeed = 6400; // Default: 0.5x speed (half speed)
-    let speedLabel = '0.5x';
+      if (moduleQuery) {
+        const modNum = parseInt(moduleQuery);
+        const found = LABS_DATA.findIndex(l => l.moduleNum === modNum);
+        if (found !== -1) {
+          currentLabIndex = found;
+          return;
+        }
+      }
+
+      // Check hash
+      const hash = window.location.hash;
+      if (hash) {
+        const hashClean = hash.replace('#', '');
+        const found = LABS_DATA.findIndex(l => l.id.includes(hashClean) || l.moduleId.includes(hashClean));
+        if (found !== -1) {
+          currentLabIndex = found;
+          return;
+        }
+      }
+    }
+
+    function renderSteppers() {
+      const lab = LABS_DATA[currentLabIndex];
+      const container = document.getElementById('stepperContainer');
+      container.innerHTML = lab.steps.map((step, idx) => `
+        <button onclick="goToStep(${idx})" class="text-left px-2.5 py-1.5 rounded-xl text-xs transition border ${
+          idx === currentStepIndex
+            ? 'bg-blue-600/20 border-blue-500 text-blue-200 font-bold active-step-glow'
+            : idx < currentStepIndex
+            ? 'bg-slate-900 border-slate-800 text-emerald-400 font-medium'
+            : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:bg-slate-800'
+        }">
+          <div class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full ${idx === currentStepIndex ? 'bg-blue-400 animate-pulse' : idx < currentStepIndex ? 'bg-emerald-400' : 'bg-slate-600'}"></span>
+            <span class="truncate">${step.shortTitle}</span>
+          </div>
+        </button>
+      `).join('');
+    }
+
+    function clearCrimsonHighlights() {
+      const highlightables = document.querySelectorAll('#canvasContainer [id^="node"]');
+      highlightables.forEach(el => el.classList.remove('crimson-highlight'));
+    }
+
+    function applyCrimsonHighlight(activeNodeId) {
+      clearCrimsonHighlights();
+      if (!activeNodeId) return;
+
+      const target = document.getElementById(activeNodeId);
+      if (target) {
+        target.classList.add('crimson-highlight');
+      } else {
+        const fallback = document.getElementById('nodeEC2');
+        if (fallback) fallback.classList.add('crimson-highlight');
+      }
+    }
+
+    function updateInspector(lab, step) {
+      const grid = document.getElementById('inspectorGrid');
+      const items = [
+        { label: "MODULE", val: `M0${lab.moduleNum}` },
+        { label: "LAB_CODE", val: `Lab ${lab.labCode}` },
+        { label: "TARGET_NODE", val: step.activeNode.replace('node', '') },
+        { label: "REGION", val: "us-east-1" },
+        { label: "STEP_PROGRESS", val: `${step.id} / ${lab.steps.length}` },
+        { label: "STATUS", val: step.status.split(':')[1] || "Active" },
+        { label: "HYPERVISOR", val: "AWS Nitro v5" },
+        { label: "ENCRYPTION", val: "AES-256 (KMS)" }
+      ];
+
+      grid.innerHTML = items.map(item => `
+        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+          <div class="text-[9px] text-slate-500">${item.label}</div>
+          <div class="text-[11px] text-slate-300 font-bold truncate">${item.val}</div>
+        </div>
+      `).join('');
+    }
+
+    function updateView() {
+      const lab = LABS_DATA[currentLabIndex];
+      const step = lab.steps[currentStepIndex];
+
+      document.getElementById('stepBadge').innerText = `Step ${step.id} of ${lab.steps.length}`;
+      
+      const cmdToDisplay = showDetailedCommand ? step.fullCommand : step.command;
+      document.getElementById('commandBox').innerText = cmdToDisplay;
+      
+      document.getElementById('stepTitle').innerText = step.title;
+      document.getElementById('stepDescription').innerText = step.description;
+      document.getElementById('stepInternal').innerText = step.internal;
+      document.getElementById('stepTip').innerText = step.tip;
+
+      document.getElementById('statusLabel').innerText = step.status;
+      const statusDot = document.getElementById('statusDot');
+      statusDot.className = `w-2 h-2 rounded-full ${step.statusColor} animate-pulse`;
+
+      document.getElementById('activePacketLabel').innerText = step.activePacket;
+
+      document.getElementById('prevBtn').disabled = currentStepIndex === 0;
+      document.getElementById('nextBtn').disabled = currentStepIndex === lab.steps.length - 1;
+
+      renderSteppers();
+      applyCrimsonHighlight(step.activeNode);
+      updateInspector(lab, step);
+
+      // Update URL hash with step
+      history.replaceState(null, '', `?lab=${lab.id}#step-${step.id}`);
+    }
+
+    function toggleCommandDetail() {
+      showDetailedCommand = !showDetailedCommand;
+      document.getElementById('toggleCmdView').innerText = showDetailedCommand ? "Show Clean" : "Show Annotated";
+      updateView();
+    }
+
+    function copyCurrentCommand() {
+      const lab = LABS_DATA[currentLabIndex];
+      const step = lab.steps[currentStepIndex];
+      const textToCopy = showDetailedCommand ? step.fullCommand : step.command;
+      
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        const copyText = document.getElementById('copyText');
+        const copyIcon = document.getElementById('copyIcon');
+        const feedback = document.getElementById('copyFeedback');
+        
+        copyText.innerText = "Copied!";
+        copyIcon.innerText = "✅";
+        if (feedback) feedback.classList.remove('hidden');
+        
+        setTimeout(() => {
+          copyText.innerText = "Copy";
+          copyIcon.innerText = "📋";
+          if (feedback) feedback.classList.add('hidden');
+        }, 2000);
+      }).catch(err => {
+        console.error('Copy failed: ', err);
+      });
+    }
 
     function setSpeed(ms, label) {
       playSpeed = ms;
@@ -470,240 +955,22 @@
       }
     }
 
-    function renderSteppers() {
-      const container = document.getElementById('stepperContainer');
-      container.innerHTML = steps.map((step, idx) => `
-        <button onclick="goToStep(${idx})" class="text-left px-3 py-2 rounded-xl text-xs transition border ${
-          idx === currentStep
-            ? 'bg-blue-600/20 border-blue-500 text-blue-200 font-bold active-step-glow'
-            : idx < currentStep
-            ? 'bg-slate-900 border-slate-800 text-emerald-400 font-medium'
-            : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:bg-slate-800'
-        }">
-          <div class="flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full ${idx === currentStep ? 'bg-blue-400 animate-pulse' : idx < currentStep ? 'bg-emerald-400' : 'bg-slate-600'}"></span>
-            <span class="truncate">${step.shortTitle}</span>
-          </div>
-        </button>
-      `).join('');
-    }
-
-    function clearCrimsonHighlights() {
-      const ids = ['nodeVPC', 'nodeSG', 'nodeSSM', 'nodeEC2', 'nodeIMDS', 'nodeIGW', 'nodeClient'];
-      ids.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.remove('crimson-highlight');
-      });
-    }
-
-    function applyCrimsonHighlight(stepId) {
-      clearCrimsonHighlights();
-      if (stepId === 1) {
-        document.getElementById('nodeVPC')?.classList.add('crimson-highlight');
-        document.getElementById('nodeClient')?.classList.add('crimson-highlight');
-      } else if (stepId === 2) {
-        document.getElementById('nodeSG')?.classList.add('crimson-highlight');
-      } else if (stepId === 3) {
-        document.getElementById('nodeSSM')?.classList.add('crimson-highlight');
-      } else if (stepId === 4) {
-        document.getElementById('nodeEC2')?.classList.add('crimson-highlight');
-      } else if (stepId === 5) {
-        document.getElementById('nodeEC2')?.classList.add('crimson-highlight');
-        document.getElementById('nodeIMDS')?.classList.add('crimson-highlight');
-      } else if (stepId === 6) {
-        document.getElementById('nodeIGW')?.classList.add('crimson-highlight');
-        document.getElementById('nodeEC2')?.classList.add('crimson-highlight');
-      } else if (stepId === 7) {
-        document.getElementById('nodeEC2')?.classList.add('crimson-highlight');
-        document.getElementById('nodeSG')?.classList.add('crimson-highlight');
-      }
-    }
-
-    function updateCanvas(step) {
-      const u = step.stateUpdate;
-
-      // Apply slow flashing crimson border on the active items on the right side
-      applyCrimsonHighlight(step.id);
-
-      // Node Client
-      const nodeClient = document.getElementById('nodeClient');
-      const clientBadge = document.getElementById('clientBadge');
-      clientBadge.innerText = u.client;
-      if (u.client !== "Idle") {
-        nodeClient.classList.add('border-blue-500', 'bg-blue-950/30');
-      } else {
-        nodeClient.classList.remove('border-blue-500', 'bg-blue-950/30');
-      }
-
-      // Node SSM
-      const nodeSSM = document.getElementById('nodeSSM');
-      if (u.ssm === "active") {
-        nodeSSM.classList.remove('opacity-40');
-        nodeSSM.classList.add('opacity-100', 'border-amber-500');
-      } else {
-        nodeSSM.classList.remove('border-amber-500');
-        nodeSSM.classList.add('opacity-40');
-      }
-
-      // Node SG
-      const nodeSG = document.getElementById('nodeSG');
-      const sgRuleCount = document.getElementById('sgRuleCount');
-      const sgRulesList = document.getElementById('sgRulesList');
-      if (u.sg === "active") {
-        nodeSG.classList.remove('opacity-40');
-        nodeSG.classList.add('opacity-100', 'border-amber-500/80');
-        sgRuleCount.innerText = "1 Ingress Rule";
-        sgRuleCount.className = "text-[10px] font-mono text-emerald-400 font-bold";
-        sgRulesList.innerHTML = `
-          <div class="text-emerald-400">✓ Ingress: TCP/80 (0.0.0.0/0)</div>
-          <div class="text-slate-400">✓ Egress: All traffic (0.0.0.0/0)</div>
-        `;
-      } else if (u.sg === "deleted") {
-        nodeSG.classList.add('opacity-30', 'border-red-500/50');
-        sgRuleCount.innerText = "Deleted";
-        sgRulesList.innerHTML = `<div class="text-red-400">Resource Destroyed</div>`;
-      } else {
-        nodeSG.classList.add('opacity-40');
-        nodeSG.classList.remove('border-amber-500/80', 'opacity-100');
-        sgRuleCount.innerText = "0 Ingress";
-        sgRulesList.innerHTML = `<div>Ingress: Deny all (default)</div><div>Egress: Allow all</div>`;
-      }
-
-      // Node EC2
-      const nodeEC2 = document.getElementById('nodeEC2');
-      const ec2State = document.getElementById('ec2State');
-      const ec2Type = document.getElementById('ec2Type');
-      const ec2Arch = document.getElementById('ec2Arch');
-      const ec2IP = document.getElementById('ec2IP');
-      const ec2Nginx = document.getElementById('ec2Nginx');
-      const bootstrapBadge = document.getElementById('bootstrapBadge');
-
-      if (u.ec2 === "initializing") {
-        nodeEC2.className = "bg-slate-900/90 border-2 border-blue-500 rounded-xl p-3 opacity-100 relative";
-        ec2State.innerText = "initializing";
-        ec2State.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-900 text-blue-300 font-bold animate-pulse";
-        ec2Type.innerText = "t4g.micro";
-        ec2Arch.innerText = "ARM64 (Graviton2)";
-        ec2IP.innerText = "54.210.88.14";
-        ec2Nginx.innerText = "Starting...";
-        ec2Nginx.className = "text-amber-400 font-bold";
-        bootstrapBadge.classList.remove('hidden');
-      } else if (u.ec2 === "bootstrapping") {
-        nodeEC2.className = "bg-slate-900/90 border-2 border-amber-500 rounded-xl p-3 opacity-100 relative";
-        ec2State.innerText = "running (bootstrap)";
-        ec2State.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-900 text-amber-200 font-bold";
-        ec2Type.innerText = "t4g.micro";
-        ec2Arch.innerText = "ARM64 (Graviton2)";
-        ec2IP.innerText = "54.210.88.14";
-        ec2Nginx.innerText = "Installing Nginx...";
-        ec2Nginx.className = "text-amber-400 font-bold";
-        bootstrapBadge.classList.remove('hidden');
-        bootstrapBadge.innerHTML = "⚙️ Executing /var/log/cloud-init-output.log";
-      } else if (u.ec2 === "running_healthy") {
-        nodeEC2.className = "bg-slate-900/90 border-2 border-emerald-500 rounded-xl p-3 opacity-100 shadow-xl shadow-emerald-500/20 relative";
-        ec2State.innerText = "running (2/2 checks passed)";
-        ec2State.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 font-bold border border-emerald-500/30";
-        ec2Type.innerText = "t4g.micro (2 vCPU / 1GB)";
-        ec2Arch.innerText = "ARM64 (Graviton2)";
-        ec2IP.innerText = "54.210.88.14 (Public)";
-        ec2Nginx.innerText = "Active: 200 OK (Port 80)";
-        ec2Nginx.className = "text-emerald-400 font-bold";
-        bootstrapBadge.classList.remove('hidden');
-        bootstrapBadge.innerHTML = "✅ Bootstrap Complete • Nginx Online";
-        bootstrapBadge.className = "mt-2 p-1.5 rounded bg-emerald-950/80 border border-emerald-500/40 text-[10px] text-emerald-200 text-center font-mono";
-      } else if (u.ec2 === "terminated") {
-        nodeEC2.className = "bg-slate-900/40 border-2 border-red-500/40 rounded-xl p-3 opacity-40 relative";
-        ec2State.innerText = "terminated";
-        ec2State.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-red-950 text-red-400";
-        ec2Type.innerText = "--";
-        ec2Arch.innerText = "--";
-        ec2IP.innerText = "--";
-        ec2Nginx.innerText = "Offline";
-        ec2Nginx.className = "text-slate-500";
-        bootstrapBadge.classList.add('hidden');
-      } else {
-        nodeEC2.className = "bg-slate-900/90 border-2 border-slate-800 rounded-xl p-3 opacity-40 relative";
-        ec2State.innerText = "Not Created";
-        ec2State.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400";
-        ec2Type.innerText = "--";
-        ec2Arch.innerText = "--";
-        ec2IP.innerText = "--";
-        ec2Nginx.innerText = "Offline";
-        ec2Nginx.className = "text-slate-500";
-        bootstrapBadge.classList.add('hidden');
-      }
-
-      // IMDSv2 Node
-      const nodeIMDS = document.getElementById('nodeIMDS');
-      if (u.imds === "active") {
-        nodeIMDS.classList.remove('opacity-40');
-        nodeIMDS.classList.add('opacity-100', 'border-emerald-500/60');
-      } else if (u.imds === "enforced") {
-        nodeIMDS.classList.remove('opacity-40');
-        nodeIMDS.classList.add('opacity-90', 'border-blue-500/40');
-      } else {
-        nodeIMDS.classList.add('opacity-40');
-        nodeIMDS.classList.remove('opacity-100', 'border-emerald-500/60', 'border-blue-500/40');
-      }
-    }
-
-    function updateView() {
-      const step = steps[currentStep];
-      document.getElementById('stepBadge').innerText = `Step ${step.id} of ${steps.length}`;
-      document.getElementById('commandBox').innerText = step.command;
-      document.getElementById('stepTitle').innerText = step.title;
-      document.getElementById('stepDescription').innerText = step.description;
-      document.getElementById('stepInternal').innerText = step.internal;
-      document.getElementById('stepTip').innerText = step.tip;
-
-      document.getElementById('statusLabel').innerText = step.status;
-      const statusDot = document.getElementById('statusDot');
-      statusDot.className = `w-2 h-2 rounded-full ${step.statusColor} animate-pulse`;
-
-      document.getElementById('activePacketLabel').innerText = step.activePacket;
-
-      document.getElementById('prevBtn').disabled = currentStep === 0;
-      document.getElementById('nextBtn').disabled = currentStep === steps.length - 1;
-
-      renderSteppers();
-      updateCanvas(step);
-    }
-
-    function copyCurrentCommand() {
-      const cmd = steps[currentStep].command;
-      navigator.clipboard.writeText(cmd).then(() => {
-        const copyText = document.getElementById('copyText');
-        const copyIcon = document.getElementById('copyIcon');
-        const feedback = document.getElementById('copyFeedback');
-        
-        copyText.innerText = "Copied!";
-        copyIcon.innerText = "✅";
-        if (feedback) feedback.classList.remove('hidden');
-        
-        setTimeout(() => {
-          copyText.innerText = "Copy";
-          copyIcon.innerText = "📋";
-          if (feedback) feedback.classList.add('hidden');
-        }, 2000);
-      }).catch(err => {
-        console.error('Failed to copy: ', err);
-      });
-    }
-
     function changeStep(delta) {
-      currentStep = Math.max(0, Math.min(steps.length - 1, currentStep + delta));
+      const lab = LABS_DATA[currentLabIndex];
+      currentStepIndex = Math.max(0, Math.min(lab.steps.length - 1, currentStepIndex + delta));
       updateView();
     }
 
     function goToStep(idx) {
-      currentStep = idx;
+      currentStepIndex = idx;
       updateView();
     }
 
     function startInterval() {
+      const lab = LABS_DATA[currentLabIndex];
       autoPlayTimer = setInterval(() => {
-        if (currentStep < steps.length - 1) {
-          currentStep++;
+        if (currentStepIndex < lab.steps.length - 1) {
+          currentStepIndex++;
           updateView();
         } else {
           clearInterval(autoPlayTimer);
@@ -727,8 +994,54 @@
       }
     }
 
-    // Initialize
-    updateView();
+    function toggleModal(open) {
+      const modal = document.getElementById('suiteModal');
+      if (open) {
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function renderModalDirectory() {
+      const container = document.getElementById('modalLabsList');
+      const modulesMap = {};
+
+      LABS_DATA.forEach((lab, idx) => {
+        if (!modulesMap[lab.moduleNum]) {
+          modulesMap[lab.moduleNum] = {
+            name: lab.moduleName,
+            icon: lab.moduleIcon,
+            labs: []
+          };
+        }
+        modulesMap[lab.moduleNum].labs.push({ ...lab, globalIndex: idx });
+      });
+
+      container.innerHTML = Object.keys(modulesMap).map(mNum => {
+        const m = modulesMap[mNum];
+        return `
+          <div class="bg-slate-950/80 rounded-xl p-3.5 border border-slate-800">
+            <h4 class="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
+              <span>${m.icon}</span> <span>Module ${mNum}: ${m.name}</span>
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              ${m.labs.map(l => `
+                <button onclick="loadLabByGlobalIndex(${l.globalIndex}); toggleModal(false);" class="text-left p-2.5 rounded-lg bg-slate-900 hover:bg-blue-900/30 border border-slate-800 hover:border-blue-500/50 transition group">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-200 group-hover:text-blue-300">Lab ${l.labCode}: ${l.title}</span>
+                    <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">${l.stepCount} Steps</span>
+                  </div>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Initialize on page load
+    window.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
 </html>

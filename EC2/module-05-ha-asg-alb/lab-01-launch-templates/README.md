@@ -8,6 +8,9 @@
 
 **[⬅️ Previous Lab](../../module-04-security-iam-ssm/lab-04-ssm-session-manager/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-05-ha-asg-alb/lab-02-alb-and-target-groups/README.md)**
 
+
+[![Interactive Simulator](https://img.shields.io/badge/🎮_Live_Simulation-Launch_Interactive_Lab-2563eb?style=for-the-badge)](https://cyber-cloud-security.github.io/aws-labs/?lab=lab-01-launch-templates)
+
 </div>
 
 ---

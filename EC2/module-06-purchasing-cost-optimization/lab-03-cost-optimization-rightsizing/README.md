@@ -8,6 +8,9 @@
 
 **[⬅️ Previous Lab](../../module-06-purchasing-cost-optimization/lab-02-asg-mixed-instances/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-07-monitoring-and-troubleshooting/lab-01-status-checks-autorecovery/README.md)**
 
+
+[![Interactive Simulator](https://img.shields.io/badge/🎮_Live_Simulation-Launch_Interactive_Lab-2563eb?style=for-the-badge)](https://cyber-cloud-security.github.io/aws-labs/?lab=lab-03-cost-optimization-rightsizing)
+
 </div>
 
 ---

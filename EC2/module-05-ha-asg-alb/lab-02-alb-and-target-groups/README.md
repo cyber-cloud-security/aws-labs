@@ -8,6 +8,9 @@
 
 **[⬅️ Previous Lab](../../module-05-ha-asg-alb/lab-01-launch-templates/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-05-ha-asg-alb/lab-03-asg-dynamic-scaling/README.md)**
 
+
+[![Interactive Simulator](https://img.shields.io/badge/🎮_Live_Simulation-Launch_Interactive_Lab-2563eb?style=for-the-badge)](https://cyber-cloud-security.github.io/aws-labs/?lab=lab-02-alb-and-target-groups)
+
 </div>
 
 ---

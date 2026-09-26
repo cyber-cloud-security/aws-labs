@@ -8,6 +8,9 @@
 
 **[⬅️ Previous Lab](../../module-03-networking-eni-placement/lab-02-elastic-ips-ha/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-03-networking-eni-placement/lab-04-placement-groups/README.md)**
 
+
+[![Interactive Simulator](https://img.shields.io/badge/🎮_Live_Simulation-Launch_Interactive_Lab-2563eb?style=for-the-badge)](https://cyber-cloud-security.github.io/aws-labs/?lab=lab-03-enhanced-networking-ena)
+
 </div>
 
 ---

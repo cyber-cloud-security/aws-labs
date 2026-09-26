@@ -8,6 +8,9 @@
 
 **[⬅️ Previous Lab](../../module-06-purchasing-cost-optimization/lab-01-spot-interruption-handling/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-06-purchasing-cost-optimization/lab-03-cost-optimization-rightsizing/README.md)**
 
+
+[![Interactive Simulator](https://img.shields.io/badge/🎮_Live_Simulation-Launch_Interactive_Lab-2563eb?style=for-the-badge)](https://cyber-cloud-security.github.io/aws-labs/?lab=lab-02-asg-mixed-instances)
+
 </div>
 
 ---

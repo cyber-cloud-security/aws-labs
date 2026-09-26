@@ -28,7 +28,7 @@
 
 1. **📐 Visual Architecture First**: Every lab begins with a high-resolution architecture diagram PNG alongside a collapsible Mermaid source drawer.
 2. **💻 Readable, Multi-Line Annotated Code**: Commands are cleanly wrapped across lines with `\` continuations and inline `# comments` — **zero horizontal scrolling** required.
-3. **📘 Inline Deep-Dive Command Breakdowns**: Every lab includes a **Deep-Dive Command & Flag Reference** section explaining every flag, JMESPath `--query` filter, Linux kernel setting, and **why it matters in production automation**.
+3. **🧠 Companion Deep-Dive Explanations**: Deep architectural explanations, command flag dissections, and Linux kernel mechanics are maintained in the dedicated companion repository [**aws-explain**](https://github.com/cyber-cloud-security/aws-explain).
 4. **🧭 Seamless Navigation**: Breadcrumb headers and `⬅️ Previous Lab` / `➡️ Next Lab` links let you move through the curriculum like a book.
 5. **🛡️ Built-In Cost & Security Guardrails**: Native callout alerts (`[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`) highlight Free Tier eligibility, security pitfalls, and mandatory teardown steps.
 

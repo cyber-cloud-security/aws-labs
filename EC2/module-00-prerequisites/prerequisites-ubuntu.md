@@ -3,9 +3,9 @@
 # 🐧 Ubuntu Linux: AWS CLI v2 & Environment Setup
 
 ![OS](https://img.shields.io/badge/🐧_OS-Ubuntu_22.04%2F24.04_LTS-E95420?style=flat-square)
-![Arch](https://img.shields.io/badge/⚙️_Arch-x86__64_%26_ARM64_(aarch64)-0969da?style=flat-square)
-![CLI](https://img.shields.io/badge/💻_CLI-AWS_CLI_v2-FF9900?style=flat-square)
-![Scope](https://img.shields.io/badge/📦_Environment-Multipass%20%7C%20WSL2%20%7C%20Native-8250df?style=flat-square)
+![Arch](https://img.shields.io/badge/⚙️_Arch-x86__64_%26_ARM64_(aarch64)-539bf5?style=flat-square)
+![CLI](https://img.shields.io/badge/💻_CLI-AWS_CLI_v2-f69d50?style=flat-square)
+![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 [⬅️ Back to Module 00 Hub](./README.md) &nbsp;•&nbsp; [🍎 macOS Setup Guide](./prerequisites-macos.md) &nbsp;•&nbsp; [🚀 Start Module 01](../module-01-fundamentals-and-lifecycle/README.md)
 
@@ -16,8 +16,7 @@
 ## 📌 Overview
 
 This guide provides step-by-step instructions to configure **Ubuntu Linux (22.04 LTS or 24.04 LTS)** for executing all 28 labs in the AWS EC2 hands-on curriculum. It applies equally to:
-- Local native Ubuntu installations
-- **Canonical Multipass VMs** on macOS or Windows
+- Local native Ubuntu workstations
 - **WSL2** (Windows Subsystem for Linux) on Windows 10/11
 - Remote Ubuntu EC2 bastion hosts
 
@@ -68,10 +67,13 @@ aws configure
 ```
 
 When prompted, enter your IAM access details:
-- **AWS Access Key ID**: `YOUR_ACCESS_KEY_ID`
-- **AWS Secret Access Key**: `YOUR_SECRET_ACCESS_KEY`
-- **Default region name**: `us-east-1`
-- **Default output format**: `json`
+
+| Configuration Field | Target Value | Description |
+| :--- | :--- | :--- |
+| **AWS Access Key ID** | `YOUR_ACCESS_KEY_ID` | IAM User Access Key |
+| **AWS Secret Access Key** | `YOUR_SECRET_ACCESS_KEY` | IAM User Secret Key |
+| **Default region name** | `us-east-1` | Primary Lab Region |
+| **Default output format** | `json` | Structured API responses |
 
 > [!TIP]
 > **IAM Permissions**: Ensure your IAM user or role has policies granting permissions for `ec2:*`, `ssm:GetParameter`, and `kms:*` to execute all curriculum labs without permission denials.
@@ -125,3 +127,4 @@ aws-cli/2.x.x Python/3.x.x Linux/6.x...
 
 Your Ubuntu environment is now configured and verified!
 👉 **[Proceed to Module 01: EC2 Fundamentals & Lifecycle](../module-01-fundamentals-and-lifecycle/README.md)**
+

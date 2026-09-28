@@ -25,13 +25,13 @@ This guide provides step-by-step instructions to configure **Ubuntu Linux (22.04
 
 ## 🛠️ Step 1: Install AWS CLI v2 & Helper Tools
 
-Run the following commands in your Ubuntu terminal. The script automatically detects whether your system is **`x86_64` (Intel/AMD)** or **`aarch64` / `arm64` (Apple Silicon VM / AWS Graviton)** and installs the correct official binary package:
-
+1. Update package lists and install required helper tools:
 ```bash
-# 1. Update package lists and install required helper tools
 sudo apt update && sudo apt install -y curl unzip jq
+```
 
-# 2. Download and install AWS CLI v2 package for your architecture
+2. Download and install AWS CLI v2 (auto-detects `x86_64` vs `aarch64` / ARM64):
+```bash
 ARCH=$(uname -m)
 if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
   echo "Detected ARM64 (aarch64) architecture..."
@@ -40,13 +40,13 @@ else
   echo "Detected x86_64 architecture..."
   curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 fi
-
-# 3. Extract and run the installer
 unzip -q awscliv2.zip
 sudo ./aws/install --update
 rm -rf aws awscliv2.zip
+```
 
-# 4. Verify installation
+3. Verify installation:
+```bash
 aws --version
 ```
 
@@ -58,7 +58,6 @@ aws --version
 By default, AWS CLI v2 pipes output into `less`. In bash sessions and automated scripts, this causes commands to hang waiting for user keypresses (`q` or `Return`).
 
 ```bash
-# Disable pager for current and future bash sessions
 export AWS_PAGER=""
 echo 'export AWS_PAGER=""' >> ~/.bashrc
 ```

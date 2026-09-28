@@ -24,24 +24,36 @@ This guide provides step-by-step instructions to configure **macOS** (both Apple
 Choose either **Homebrew (Recommended)** or the **Official Apple PKG Installer**:
 
 ### Option A: Install via Homebrew (Recommended)
-```bash
-# 1. Install AWS CLI v2 and jq via Homebrew
-brew install awscli jq
 
-# 2. Verify installation
+1. Install AWS CLI v2 and `jq`:
+```bash
+brew install awscli jq
+```
+
+2. Verify installation:
+```bash
 aws --version
 ```
 
 ### Option B: Install via Official macOS PKG Installer
+
+1. Download the official AWS installer package:
 ```bash
-# 1. Download official AWS installer package
 curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+```
 
-# 2. Install to system
+2. Install to system:
+```bash
 sudo installer -pkg AWSCLIV2.pkg -target /
-rm -f AWSCLIV2.pkg
+```
 
-# 3. Verify installation
+3. Clean up the installer package:
+```bash
+rm -f AWSCLIV2.pkg
+```
+
+4. Verify installation:
+```bash
 aws --version
 ```
 
@@ -49,14 +61,16 @@ aws --version
 
 ## ⚙️ Step 2: Configure Terminal Optimization & AWS Credentials
 
-### 1. Disable AWS CLI Terminal Paging
-By default, AWS CLI v2 pipes output into `less`. In macOS Terminal/iTerm2 zsh sessions, this causes commands to hang waiting for user keypresses (`q` or `Return`).
+### 1. Optimize Zsh Terminal Settings (Disable Pager & Enable Interactive Comments)
+By default, macOS `zsh` disables comments in interactive sessions (which causes `zsh: command not found: #` when pasting code) and AWS CLI pipes output into `less` (causing commands to hang).
+
+Run this to fix both behaviors permanently:
 
 ```bash
-# Disable pager for current and future zsh / bash sessions
 export AWS_PAGER=""
-echo 'export AWS_PAGER=""' >> ~/.zshrc 2>/dev/null || true
-echo 'export AWS_PAGER=""' >> ~/.bashrc 2>/dev/null || true
+setopt INTERACTIVE_COMMENTS 2>/dev/null || true
+echo 'export AWS_PAGER=""' >> ~/.zshrc
+echo 'setopt INTERACTIVE_COMMENTS' >> ~/.zshrc
 ```
 
 ### 2. Configure Your AWS Credentials

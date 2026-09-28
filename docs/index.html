@@ -178,7 +178,7 @@
             </div>
             <span id="copyFeedback" class="text-[10px] text-emerald-400 font-mono font-semibold hidden animate-pulse">✓ Copied!</span>
           </div>
-          <div class="bg-black/80 rounded-xl p-3 border border-slate-800/80 font-mono text-xs text-emerald-400 overflow-x-auto code-scroll relative group max-h-[220px]">
+          <div class="bg-[#1c2128] rounded-xl p-3 border border-[#373e47] font-mono text-xs text-[#6cb6ff] overflow-x-auto code-scroll relative group max-h-[220px]">
             <pre id="commandBox" class="whitespace-pre-wrap leading-relaxed"></pre>
           </div>
         </div>
@@ -874,6 +874,12 @@
       `).join('');
     }
 
+    function formatCodeSpans(text) {
+      if (!text) return '';
+      const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return escaped.replace(/`([^`]+)`/g, '<code class="font-mono text-[#f69d50] bg-[#2d333b] px-1.5 py-0.5 rounded border border-[#444c56] text-xs">$1</code>');
+    }
+
     function updateView() {
       const lab = LABS_DATA[currentLabIndex];
       const step = lab.steps[currentStepIndex];
@@ -884,9 +890,9 @@
       document.getElementById('commandBox').innerText = cmdToDisplay;
       
       document.getElementById('stepTitle').innerText = step.title;
-      document.getElementById('stepDescription').innerText = step.description;
-      document.getElementById('stepInternal').innerText = step.internal;
-      document.getElementById('stepTip').innerText = step.tip;
+      document.getElementById('stepDescription').innerHTML = formatCodeSpans(step.description);
+      document.getElementById('stepInternal').innerHTML = formatCodeSpans(step.internal);
+      document.getElementById('stepTip').innerHTML = formatCodeSpans(step.tip);
 
       document.getElementById('statusLabel').innerText = step.status;
       const statusDot = document.getElementById('statusDot');

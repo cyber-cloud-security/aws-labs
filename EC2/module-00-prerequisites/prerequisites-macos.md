@@ -2,10 +2,10 @@
 
 # 🍎 macOS: AWS CLI v2 & Environment Setup
 
-![OS](https://img.shields.io/badge/🍎_OS-macOS_Sequoia%20%7C%20Sonoma%20%7C%20Ventura-000000?style=flat-square)
-![Arch](https://img.shields.io/badge/⚙️_Chip-Apple_Silicon_(M1--M4)_%26_Intel-0969da?style=flat-square)
-![CLI](https://img.shields.io/badge/💻_CLI-AWS_CLI_v2-FF9900?style=flat-square)
-![Pkg](https://img.shields.io/badge/📦_Manager-Homebrew%20%7C%20Official_PKG-2da44e?style=flat-square)
+![OS](https://img.shields.io/badge/🍎_OS-macOS_Sequoia%20%7C%20Sonoma%20%7C%20Ventura-22272e?style=flat-square)
+![Arch](https://img.shields.io/badge/⚙️_Chip-Apple_Silicon_(M1--M4)_%26_Intel-539bf5?style=flat-square)
+![CLI](https://img.shields.io/badge/💻_CLI-AWS_CLI_v2-f69d50?style=flat-square)
+![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 [⬅️ Back to Module 00 Hub](./README.md) &nbsp;•&nbsp; [🐧 Ubuntu Setup Guide](./prerequisites-ubuntu.md) &nbsp;•&nbsp; [🚀 Start Module 01](../module-01-fundamentals-and-lifecycle/README.md)
 
@@ -79,10 +79,13 @@ aws configure
 ```
 
 When prompted, enter your IAM access details:
-- **AWS Access Key ID**: `YOUR_ACCESS_KEY_ID`
-- **AWS Secret Access Key**: `YOUR_SECRET_ACCESS_KEY`
-- **Default region name**: `us-east-1`
-- **Default output format**: `json`
+
+| Configuration Field | Target Value | Description |
+| :--- | :--- | :--- |
+| **AWS Access Key ID** | `YOUR_ACCESS_KEY_ID` | IAM User Access Key |
+| **AWS Secret Access Key** | `YOUR_SECRET_ACCESS_KEY` | IAM User Secret Key |
+| **Default region name** | `us-east-1` | Primary Lab Region |
+| **Default output format** | `json` | Structured API responses |
 
 > [!TIP]
 > **IAM Permissions**: Ensure your IAM user or role has policies granting permissions for `ec2:*`, `ssm:GetParameter`, and `kms:*` to execute all curriculum labs without permission denials.

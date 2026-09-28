@@ -2,11 +2,11 @@
 
 # ⚙️ Module 00: Global Prerequisites & AWS CLI Setup Hub
 
-![AWS](https://img.shields.io/badge/☁️_Platform-Amazon_Web_Services-FF9900?style=flat-square)
+![AWS](https://img.shields.io/badge/☁️_Platform-Amazon_Web_Services-f69d50?style=flat-square)
 ![OS](https://img.shields.io/badge/🐧_Linux-Ubuntu_22.04%2F24.04-E95420?style=flat-square)
-![OS](https://img.shields.io/badge/🍎_macOS-Intel_%26_Apple_Silicon-000000?style=flat-square)
-![CLI](https://img.shields.io/badge/💻_Execution-AWS_CLI_v2-0969da?style=flat-square)
-![Curriculum](https://img.shields.io/badge/🖥️_EC2_Mastery-28_Labs_Baseline-2da44e?style=flat-square)
+![OS](https://img.shields.io/badge/🍎_macOS-Intel_%26_Apple_Silicon-539bf5?style=flat-square)
+![CLI](https://img.shields.io/badge/💻_Execution-AWS_CLI_v2-f69d50?style=flat-square)
+![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 [🏠 EC2 Index](../README.md) &nbsp;•&nbsp; [🚀 Start Module 01: Foundations](../module-01-fundamentals-and-lifecycle/README.md) &nbsp;•&nbsp; [🎮 Live Interactive Simulator](https://cyber-cloud-security.github.io/aws-labs/)
 

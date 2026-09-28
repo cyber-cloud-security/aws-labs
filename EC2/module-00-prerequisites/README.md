@@ -8,7 +8,7 @@
 ![CLI](https://img.shields.io/badge/💻_Execution-AWS_CLI_v2-f69d50?style=flat-square)
 ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
-[🏠 EC2 Index](../README.md) &nbsp;•&nbsp; [🚀 Start Module 01: Foundations](../module-01-fundamentals-and-lifecycle/README.md) &nbsp;•&nbsp; [🎮 Live Interactive Simulator](https://cyber-cloud-security.github.io/aws-labs/)
+[🏠 EC2 Index](../README.md) &nbsp;•&nbsp; [🚀 Start Module 01: Foundations](../module-01-fundamentals-and-lifecycle/README.md) &nbsp;•&nbsp; <a href="https://cyber-cloud-security.github.io/aws-labs/" target="_blank" rel="noopener noreferrer">🎮 Live Interactive Simulator</a>
 
 </div>
 

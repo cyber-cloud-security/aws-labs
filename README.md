@@ -15,7 +15,7 @@
 
 <div align="center">
 
-[![Live Interactive Simulator](https://img.shields.io/badge/🎮_Live_Interactive_Simulator-Launch_All_28_Labs_Suite-2563eb?style=for-the-badge&logo=amazon-aws&logoColor=white)](https://cyber-cloud-security.github.io/aws-labs/)
+<a href="https://cyber-cloud-security.github.io/aws-labs/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/🎮_Live_Interactive_Simulator-Launch_All_28_Labs_Suite-2563eb?style=for-the-badge&logo=amazon-aws&logoColor=white" alt="Live Interactive Simulator"></a>
 
 *🚀 Experience step-by-step CLI execution, dynamic packet animations, active component flashing borders, and under-the-hood AWS control/data plane state transitions live in your browser.*
 

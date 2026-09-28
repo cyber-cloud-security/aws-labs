@@ -9,7 +9,7 @@
 **[⬅️ Previous Lab](../../module-03-networking-eni-placement/lab-01-dual-eni-routing/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-03-networking-eni-placement/lab-03-enhanced-networking-ena/README.md)**
 
 
-[![Interactive Simulator](https://img.shields.io/badge/🎮_Live_Simulation-Launch_Interactive_Lab-2563eb?style=for-the-badge)](https://cyber-cloud-security.github.io/aws-labs/?lab=lab-02-elastic-ips-ha)
+<a href="https://cyber-cloud-security.github.io/aws-labs/?lab=lab-02-elastic-ips-ha" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/🎮_Live_Simulation-Launch_Interactive_Lab-2563eb?style=for-the-badge" alt="Interactive Simulation"></a>
 
 </div>
 

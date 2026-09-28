@@ -6,6 +6,7 @@
 ![EC2 Labs](https://img.shields.io/badge/🖥️_EC2_Curriculum-28_Labs_Live-2da44e?style=flat-square)
 ![CLI](https://img.shields.io/badge/💻_Execution-AWS_CLI_v2-0969da?style=flat-square)
 ![License](https://img.shields.io/badge/📖_Format-Step--by--Step_Annotated-8250df?style=flat-square)
+![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 *Hands-on laboratories, step-by-step CLI execution guides, pre-rendered architectural diagrams, and deep-dive technical command explanations for Amazon Web Services (AWS).*
 
@@ -36,7 +37,7 @@
 > **Built Like an Interactive Engineering Textbook**: Every lab in this repository is formatted so that reading both **code** and **architectural prose** is effortless on GitHub.
 
 1. **📐 Visual Architecture First**: Every lab begins with a high-resolution architecture diagram PNG alongside a collapsible Mermaid source drawer.
-2. **💻 Readable, Multi-Line Annotated Code**: Commands are cleanly wrapped across lines with `\` continuations and inline `# comments` — **zero horizontal scrolling** required.
+2. **💻 Readable, Multi-Line Annotated Code**: Commands are cleanly wrapped across lines with `\` continuations and separate numbered steps above code blocks — **zero horizontal scrolling** required.
 3. **🧠 Companion Deep-Dive Explanations**: Deep architectural explanations, command flag dissections, and Linux kernel mechanics are maintained in the dedicated companion repository [**aws-explain**](https://github.com/cyber-cloud-security/aws-explain).
 4. **🧭 Seamless Navigation**: Breadcrumb headers and `⬅️ Previous Lab` / `➡️ Next Lab` links let you move through the curriculum like a book.
 5. **🛡️ Built-In Cost & Security Guardrails**: Native callout alerts (`[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`) highlight Free Tier eligibility, security pitfalls, and mandatory teardown steps.
@@ -61,16 +62,20 @@
 
 ## 🚀 Quick Start
 
+1. Clone repository and navigate to EC2:
 ```bash
-# 1. Clone the repository
 git clone https://github.com/cyber-cloud-security/aws-labs.git
 cd aws-labs/EC2
+```
 
-# 2. Validate local AWS CLI v2 & default VPC prerequisites
+2. Validate local AWS CLI v2 & default VPC prerequisites:
+```bash
 chmod +x ./scripts/setup_prereqs.sh
 ./scripts/setup_prereqs.sh
+```
 
-# 3. Audit & clean up any active lab resources when finished
+3. Audit & clean up any active lab resources when finished:
+```bash
 chmod +x ./scripts/cleanup_all.sh
 ./scripts/cleanup_all.sh
 ```

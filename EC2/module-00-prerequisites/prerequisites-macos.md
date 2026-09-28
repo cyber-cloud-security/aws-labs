@@ -118,23 +118,6 @@ aws-cli/2.x.x Python/3.x.x Darwin/...
 
 ---
 
-## 💻 Step 4 (Optional): Install Canonical Multipass for an Isolated Linux VM
-
-If you prefer to run labs inside a clean Ubuntu virtual machine on your Mac:
-
-```bash
-# 1. Install Multipass via Homebrew
-brew install --cask multipass
-
-# 2. Launch an Ubuntu 24.04 LTS instance
-multipass launch 24.04 --name dev-ubuntu --cpus 2 --memory 4G --disk 20G
-
-# 3. Enter the VM shell
-multipass shell dev-ubuntu
-```
-
----
-
 ## 🚀 Next Steps
 
 Your macOS environment is now configured and verified!

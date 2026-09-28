@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 08](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Paid_%28~%240.05_--_%240.15%29-d29922?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-08_%E2%80%94_Advanced_Compute_%26_AWS_Nitro_System-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Paid_%28~%240.05_--_%240.15%29-d29922?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-08_%E2%80%94_Advanced_Compute_%26_AWS_Nitro_System-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-08-advanced-nitro/lab-01-nitro-architecture/README.md)** &nbsp;|&nbsp; **➡️ Next Lab (Completed! 🎉)**
 
@@ -91,6 +91,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch EC2 Instance with Enclaves Enabled
+
+1. Query network and AMI parameters:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -105,8 +107,10 @@ export SUBNET_ID=$(aws ec2 describe-subnets \
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
-# Launch c5.xlarge with Enclaves enabled:
+2. Launch `c5.xlarge` instance with enclave options enabled:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "c5.xlarge" \
@@ -114,18 +118,25 @@ INSTANCE_ID=$(aws ec2 run-instances \
   --enclave-options Enabled=true \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=nitro-enclave-host}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
-echo "Launched Enclave Host: ${INSTANCE_ID}"
+3. Confirm launch and wait for running state:
+```bash
+echo "[SUCCESS] Launched Enclave Host: ${INSTANCE_ID}"
 aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
 
 ### Step 2: Install Nitro CLI & Docker (Guest OS)
-Connect to the instance via Session Manager or SSH:
-```bash
-# 1. Install Nitro Enclaves CLI and Docker
-sudo dnf install -y aws-nitro-enclaves-cli aws-nitro-enclaves-cli-devel docker
 
-# 2. Add user to groups and start services
+Connect to the instance via Session Manager or SSH:
+
+1. Install packages:
+```bash
+sudo dnf install -y aws-nitro-enclaves-cli aws-nitro-enclaves-cli-devel docker
+```
+
+2. Add user permissions and enable services:
+```bash
 sudo usermod -aG ne-users ec2-user
 sudo usermod -aG docker ec2-user
 sudo systemctl start docker
@@ -135,12 +146,15 @@ sudo systemctl enable nitro-enclaves-allocator.service
 ```
 
 ### Step 3: Configure Enclave Resource Allocator
-Edit `/etc/nitro_enclaves/allocator.yaml` to reserve 2 vCPUs and 1024 MB RAM for the enclave:
+
+1. Edit `/etc/nitro_enclaves/allocator.yaml` to reserve 2 vCPUs and 1024 MB RAM:
 ```bash
 sudo sed -i 's/memory_mib: .*/memory_mib: 1024/' /etc/nitro_enclaves/allocator.yaml
 sudo sed -i 's/cpu_count: .*/cpu_count: 2/' /etc/nitro_enclaves/allocator.yaml
+```
 
-# Restart allocator service
+2. Restart allocator service:
+```bash
 sudo systemctl restart nitro-enclaves-allocator.service
 ```
 
@@ -149,29 +163,36 @@ sudo systemctl restart nitro-enclaves-allocator.service
 ## 🔍 Verification: Build & Run a Nitro Enclave
 
 ### 1. Build a Minimal Docker Container
+1. Create project workspace and Dockerfile:
 ```bash
 mkdir -p ~/hello-enclave && cd ~/hello-enclave
 
-cat <<'DOCKERFILE' > Dockerfile
+cat << 'DOCKERFILE' > Dockerfile
 FROM alpine:latest
 CMD while true; do echo "Hello from inside Secure Nitro Enclave at $(date)"; sleep 5; done
 DOCKERFILE
+```
 
+2. Build Docker container image:
+```bash
 sudo docker build -t hello-enclave:latest .
 ```
 
 ### 2. Convert Container to Enclave Image File (`.eif`)
+1. Build EIF image:
 ```bash
 nitro-cli build-enclave \
   --docker-uri hello-enclave:latest \
   --output-file hello-enclave.eif
 ```
-Notice the cryptographic measurement output:
+
+Cryptographic measurements output include:
 - `PCR0`: Hash of the kernel and enclave image.
 - `PCR1`: Hash of the OS kernel and boot parameters.
 - `PCR2`: Hash of the application code.
 
 ### 3. Run the Enclave
+1. Launch enclave instance:
 ```bash
 nitro-cli run-enclave \
   --eif-path hello-enclave.eif \
@@ -181,38 +202,40 @@ nitro-cli run-enclave \
 ```
 
 ### 4. Inspect Enclave Status & Console
-Query running enclaves:
+1. Query running enclaves:
 ```bash
 nitro-cli describe-enclaves
 ```
-View the enclave console output:
+
+2. Capture enclave ID and stream console logs:
 ```bash
 ENCLAVE_ID=$(nitro-cli describe-enclaves | grep -oP '(?<="EnclaveID": ")[^"]*')
 nitro-cli console --enclave-id "${ENCLAVE_ID}"
 ```
-**Output**:
-```text
-Hello from inside Secure Nitro Enclave at ...
-Hello from inside Secure Nitro Enclave at ...
-```
-Terminate the console stream with `Ctrl + C`.
+
+Exit the console stream using `Ctrl + C`.
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Inside instance, terminate enclave:
 ```bash
-# Inside instance:
 nitro-cli terminate-enclave --enclave-id "${ENCLAVE_ID}" 2>/dev/null || true
+```
 
-# From local terminal:
+2. From local terminal, terminate the EC2 host:
+```bash
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
-echo "Lab 8.2 clean-up completed successfully."
+```
+
+3. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 8.2 clean-up completed successfully."
 ```
 
 ---

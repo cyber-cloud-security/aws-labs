@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 08](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-08_%E2%80%94_Advanced_Compute_%26_AWS_Nitro_System-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-08_%E2%80%94_Advanced_Compute_%26_AWS_Nitro_System-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-07-monitoring-and-troubleshooting/lab-04-vpc-flow-logs/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-08-advanced-nitro/lab-02-nitro-enclaves/README.md)**
 
@@ -93,6 +93,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch a Nitro-Based Instance
+
+1. Query network and AMI parameters:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -107,15 +109,21 @@ export SUBNET_ID=$(aws ec2 describe-subnets \
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
+2. Launch instance on Nitro architecture:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
   --subnet-id "${SUBNET_ID}" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=nitro-explorer}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
-echo "Launched Nitro Explorer Node: ${INSTANCE_ID}"
+3. Confirm launch and wait for running state:
+```bash
+echo "[SUCCESS] Launched Nitro Explorer Node: ${INSTANCE_ID}"
 aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
 
@@ -126,50 +134,45 @@ aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 Connect to the instance via SSM Session Manager or SSH:
 
 ### 1. Inspect PCIe Devices Offloaded to Nitro
-Install `pciutils` and inspect the PCIe bus:
+1. Install device utilities:
 ```bash
 sudo dnf install -y pciutils nvme-cli
-
-lspci -nn
 ```
-**Sample Output**:
-```text
-00:00.0 Host bridge [0600]: Intel Corporation 440FX ...
-00:04.0 Ethernet controller [0200]: Amazon.com, Inc. Elastic Network Adapter (ENA) [1d0f:ec20]
-00:1f.0 Non-Volatile memory controller [0108]: Amazon.com, Inc. NVMe Controller [1d0f:8061]
+
+2. Inspect the PCIe bus:
+```bash
+lspci -nn
 ```
 Notice vendor ID `[1d0f]`—**Amazon's custom PCI vendor identifier** for Nitro ASIC hardware controllers.
 
 ### 2. Inspect NVMe Controllers and EBS Volume Serialization
-Query the NVMe subsystem:
+1. Query the NVMe subsystem:
 ```bash
 sudo nvme list
 ```
-**Sample Output**:
-```text
-Node             SN                   Model               Namespace Usage
-/dev/nvme0n1     vol0123456789abcdef0 Amazon Elastic Block Store 1    8.59 GB / 8.59 GB
-```
-Notice the Serial Number (`SN`) of the NVMe disk is the **exact AWS EBS Volume ID** (`vol-xxxx`) passed straight through from the Nitro Card for EBS!
+The Serial Number (`SN`) of the NVMe disk matches the **AWS EBS Volume ID** (`vol-xxxx`) passed directly from the Nitro Card for EBS.
 
 ### 3. Check Hypervisor Features in `/proc/cpuinfo`
 ```bash
 grep -E "hypervisor|flags" /proc/cpuinfo | head -n 2
 ```
-On Nitro instances, flags reveal modern hardware virtualization extensions without legacy Xen paravirtualization hooks.
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Terminate the explorer instance:
 ```bash
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
-echo "Lab 8.1 clean-up completed successfully."
+```
+
+2. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 8.1 clean-up completed successfully."
 ```
 
 ---

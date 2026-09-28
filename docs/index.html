@@ -312,7 +312,7 @@
             <div id="badgeClient" class="mt-1 text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">Ready</div>
           </div>
 
-          <div id="nodeSSM" class="w-44 bg-slate-900 border border-slate-800 rounded-xl p-2.5 opacity-60 transition-all duration-500">
+          <div id="nodeSSM" class="w-44 bg-slate-900 border border-slate-800 rounded-xl p-2.5 opacity-90 transition-all duration-500">
             <div class="flex items-center gap-1.5 mb-1">
               <span class="text-base">📦</span>
               <span class="text-xs font-bold text-amber-400">SSM Parameter / AMI</span>
@@ -340,22 +340,22 @@
               <div id="nodeSG" class="bg-slate-900/90 border border-slate-700 rounded-xl p-2.5 transition-all duration-500">
                 <div class="flex items-center justify-between mb-1">
                   <span class="text-xs font-bold text-amber-300 flex items-center gap-1">🛡️ Security Group</span>
-                  <span id="badgeSG" class="text-[9px] font-mono text-slate-400">Stateful Firewall</span>
+                  <span id="badgeSG" class="text-[9px] font-mono text-slate-500">Unassigned</span>
                 </div>
                 <div class="text-[9px] font-mono text-slate-400 bg-slate-950 p-1.5 rounded border border-slate-800" id="sgRulesBox">
-                  <div>Ingress: Port 80 / Port 22</div>
-                  <div>Egress: 0.0.0.0/0 (All)</div>
+                  <div>Ingress: None (Deny All)</div>
+                  <div>Egress: None</div>
                 </div>
               </div>
 
               <div id="nodeEC2" class="bg-slate-900/90 border-2 border-slate-800 rounded-xl p-2.5 transition-all duration-500 relative">
                 <div class="flex items-center justify-between mb-1">
                   <span class="text-xs font-bold text-emerald-400 flex items-center gap-1">🖥️ EC2 Instance</span>
-                  <span id="badgeEC2" class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300">running</span>
+                  <span id="badgeEC2" class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">⚪ Not Provisioned</span>
                 </div>
                 <div class="text-[9px] font-mono text-slate-300 space-y-0.5">
-                  <div class="flex justify-between"><span>Arch:</span> <span id="valArch" class="text-slate-400">ARM64 / x86</span></div>
-                  <div class="flex justify-between"><span>Lifecycle:</span> <span id="valState" class="text-slate-400">Active</span></div>
+                  <div class="flex justify-between"><span>Arch:</span> <span id="valArch" class="text-slate-400">Pending Selection</span></div>
+                  <div class="flex justify-between"><span>Lifecycle:</span> <span id="valState" class="text-slate-400">Offline</span></div>
                 </div>
               </div>
             </div>
@@ -701,7 +701,7 @@
     function init() {
       populateModuleSelector();
       parseUrlParams();
-      loadLabByGlobalIndex(currentLabIndex);
+      loadLabByGlobalIndex(currentLabIndex, true);
       renderModalDirectory();
     }
 
@@ -737,7 +737,7 @@
       if (firstLabIndex !== -1) {
         currentLabIndex = firstLabIndex;
         currentStepIndex = 0;
-        loadLabByGlobalIndex(currentLabIndex);
+        loadLabByGlobalIndex(currentLabIndex, false);
       }
     }
 
@@ -746,11 +746,11 @@
       if (labIndex !== -1) {
         currentLabIndex = labIndex;
         currentStepIndex = 0;
-        loadLabByGlobalIndex(currentLabIndex);
+        loadLabByGlobalIndex(currentLabIndex, false);
       }
     }
 
-    function loadLabByGlobalIndex(globalIdx) {
+    function loadLabByGlobalIndex(globalIdx, preserveStep = false) {
       if (autoPlayTimer) {
         clearInterval(autoPlayTimer);
         autoPlayTimer = null;
@@ -759,7 +759,11 @@
       }
 
       currentLabIndex = globalIdx;
+      if (!preserveStep) {
+        currentStepIndex = 0;
+      }
       const lab = LABS_DATA[currentLabIndex];
+      currentStepIndex = Math.max(0, Math.min(lab.steps.length - 1, currentStepIndex));
 
       document.getElementById('moduleSelect').value = lab.moduleNum;
       updateLabSelector(lab.moduleNum);
@@ -770,9 +774,6 @@
       document.getElementById('labMainTitle').innerText = `🚀 ${lab.title}`;
       document.getElementById('moduleIcon').innerText = lab.moduleIcon;
       document.getElementById('moduleDesc').innerText = lab.moduleDesc;
-
-      // Update URL hash for deep linking
-      history.replaceState(null, '', `?lab=${lab.id}#step-${currentStepIndex + 1}`);
 
       // Load specific architecture canvas
       const container = document.getElementById('canvasContainer');
@@ -792,27 +793,29 @@
         const found = LABS_DATA.findIndex(l => l.id === labQuery || l.labCode === labQuery);
         if (found !== -1) {
           currentLabIndex = found;
-          return;
         }
-      }
-
-      if (moduleQuery) {
+      } else if (moduleQuery) {
         const modNum = parseInt(moduleQuery);
         const found = LABS_DATA.findIndex(l => l.moduleNum === modNum);
         if (found !== -1) {
           currentLabIndex = found;
-          return;
         }
       }
 
-      // Check hash
+      // Check hash for lab ID or step index
       const hash = window.location.hash;
       if (hash) {
         const hashClean = hash.replace('#', '');
-        const found = LABS_DATA.findIndex(l => l.id.includes(hashClean) || l.moduleId.includes(hashClean));
-        if (found !== -1) {
-          currentLabIndex = found;
-          return;
+        if (hashClean.startsWith('step-')) {
+          const stepNum = parseInt(hashClean.replace('step-', ''));
+          if (!isNaN(stepNum) && stepNum >= 1) {
+            currentStepIndex = stepNum - 1;
+          }
+        } else {
+          const found = LABS_DATA.findIndex(l => l.id.includes(hashClean) || l.moduleId.includes(hashClean));
+          if (found !== -1) {
+            currentLabIndex = found;
+          }
         }
       }
     }
@@ -854,23 +857,129 @@
       }
     }
 
+    function updateCanvasDynamicState(lab, step) {
+      if (lab.architectureType === 'compute_lifecycle') {
+        const badgeEC2 = document.getElementById('badgeEC2');
+        const valArch = document.getElementById('valArch');
+        const valState = document.getElementById('valState');
+        const badgeSG = document.getElementById('badgeSG');
+        const sgRulesBox = document.getElementById('sgRulesBox');
+        const badgeClient = document.getElementById('badgeClient');
+        const badgeSSM = document.getElementById('badgeSSM');
+
+        if (badgeClient) {
+          if (step.id === 1) {
+            badgeClient.innerText = "AWS_REGION set";
+            badgeClient.className = "mt-1 text-[9px] px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 font-mono";
+          } else {
+            badgeClient.innerText = "Ready";
+            badgeClient.className = "mt-1 text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono";
+          }
+        }
+
+        if (badgeSSM) {
+          if (step.id >= 6) {
+            badgeSSM.innerText = "al2023-arm64 (Resolved)";
+            badgeSSM.className = "mt-1 text-[9px] px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 font-mono";
+          } else {
+            badgeSSM.innerText = "ARM64 Graviton";
+            badgeSSM.className = "mt-1 text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono";
+          }
+        }
+
+        if (badgeSG && sgRulesBox) {
+          if (step.id < 4) {
+            badgeSG.innerText = "Unassigned";
+            badgeSG.className = "text-[9px] font-mono text-slate-500";
+            sgRulesBox.innerHTML = '<div>Ingress: None (Deny All)</div><div>Egress: None</div>';
+          } else if (step.id === 4) {
+            badgeSG.innerText = "Created (Deny Ingress)";
+            badgeSG.className = "text-[9px] font-mono text-amber-400";
+            sgRulesBox.innerHTML = '<div>Ingress: Deny All (Default)</div><div>Egress: 0.0.0.0/0 (All)</div>';
+          } else {
+            badgeSG.innerText = "Port 80 Allowed";
+            badgeSG.className = "text-[9px] font-mono text-emerald-400";
+            sgRulesBox.innerHTML = '<div class="text-emerald-300">Ingress: Port 80 (0.0.0.0/0)</div><div>Egress: 0.0.0.0/0 (All)</div>';
+          }
+        }
+
+        if (badgeEC2 && valArch && valState) {
+          if (step.id < 7) {
+            badgeEC2.innerText = "⚪ Not Provisioned";
+            badgeEC2.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400";
+            valArch.innerText = "Pending Selection";
+            valState.innerText = "Offline";
+          } else if (step.id === 7) {
+            badgeEC2.innerText = "🟡 pending";
+            badgeEC2.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 animate-pulse";
+            valArch.innerText = "ARM64 (t4g.micro)";
+            valState.innerText = "pending (Nitro Boot)";
+          } else if (step.id === 8) {
+            badgeEC2.innerText = "🟢 running";
+            badgeEC2.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300";
+            valArch.innerText = "ARM64 (t4g.micro)";
+            valState.innerText = "running (cloud-init)";
+          } else {
+            badgeEC2.innerText = "🟢 running";
+            badgeEC2.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300";
+            valArch.innerText = "ARM64 (t4g.micro)";
+            valState.innerText = "running (Ready)";
+          }
+        }
+      }
+    }
+
     function updateInspector(lab, step) {
       const grid = document.getElementById('inspectorGrid');
+      
+      const nodeNameMap = {
+        nodeClient: 'DevOps CLI',
+        nodeSSM: 'SSM Parameter Store',
+        nodeVPC: 'VPC & Subnet',
+        nodeSG: 'Security Group',
+        nodeEC2: 'EC2 Instance',
+        nodeIGW: 'Internet Gateway',
+        nodeStorage: 'EBS Storage',
+        nodeIMDS: 'IMDSv2 Service',
+        nodeEFS: 'EFS Storage',
+        nodeNitro: 'Nitro Hardware',
+        nodeENI: 'Primary ENI (eth0)',
+        nodeEIP: 'Elastic IP',
+        nodeIAM: 'IAM Instance Profile',
+        nodeALB: 'Application Load Balancer',
+        nodeASG: 'Auto Scaling Group',
+        nodeSpot: 'Spot Pool',
+        nodeEnclave: 'Nitro Enclave'
+      };
+      
+      const targetNodeVal = nodeNameMap[step.activeNode] || (step.activeNode ? step.activeNode.replace('node', '') : 'EC2');
+      
+      let hypervisorVal = "AWS Nitro v5";
+      if (lab.architectureType === 'compute_lifecycle') {
+        if (step.id < 7) {
+          hypervisorVal = "Awaiting Launch";
+        } else if (step.id === 7) {
+          hypervisorVal = "Nitro v5 (Booting)";
+        } else {
+          hypervisorVal = "Nitro v5 (Active)";
+        }
+      }
+
       const items = [
         { label: "MODULE", val: `M0${lab.moduleNum}` },
         { label: "LAB_CODE", val: `Lab ${lab.labCode}` },
-        { label: "TARGET_NODE", val: step.activeNode.replace('node', '') },
+        { label: "TARGET_NODE", val: targetNodeVal },
         { label: "REGION", val: "us-east-1" },
         { label: "STEP_PROGRESS", val: `${step.id} / ${lab.steps.length}` },
-        { label: "STATUS", val: step.status.split(':')[1] || "Active" },
-        { label: "HYPERVISOR", val: "AWS Nitro v5" },
+        { label: "STATUS", val: step.status.includes(':') ? step.status.split(':')[1].trim() : step.status },
+        { label: "HYPERVISOR", val: hypervisorVal },
         { label: "ENCRYPTION", val: "AES-256 (KMS)" }
       ];
 
       grid.innerHTML = items.map(item => `
         <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
           <div class="text-[9px] text-slate-500">${item.label}</div>
-          <div class="text-[11px] text-slate-300 font-bold truncate">${item.val}</div>
+          <div class="text-[11px] text-slate-300 font-bold truncate" title="${item.val}">${item.val}</div>
         </div>
       `).join('');
     }
@@ -906,6 +1015,7 @@
 
       renderSteppers();
       applyCrimsonHighlight(step.activeNode);
+      updateCanvasDynamicState(lab, step);
       updateInspector(lab, step);
 
       // Update URL hash with step

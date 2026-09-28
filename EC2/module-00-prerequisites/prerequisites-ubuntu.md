@@ -122,20 +122,6 @@ aws-cli/2.x.x Python/3.x.x Linux/6.x...
 
 ---
 
-## 💻 Step 4 (Optional): Setting up Canonical Multipass on macOS/Windows
-
-If you are using Canonical Multipass to run Ubuntu on your Mac or PC:
-
-```bash
-# Launch a dedicated Ubuntu 24.04 LTS development VM
-multipass launch 24.04 --name dev-ubuntu --cpus 2 --memory 4G --disk 20G
-
-# Connect to the VM shell
-multipass shell dev-ubuntu
-```
-
----
-
 ## 🚀 Next Steps
 
 Your Ubuntu environment is now configured and verified!

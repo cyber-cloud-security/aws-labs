@@ -24,10 +24,10 @@ const LABS_DATA = [
         "description": "`export AWS_REGION=...` Sets the `AWS_REGION` environment variable in the current shell session. Because it is exported, any subshell or subsequent CLI command spawned in this terminal inherits this variable. The AWS CLI automatically detects `AWS_REGION` and uses it as the default target region.",
         "internal": "AWS Regional API Control Plane synchronizes hypervisor state and executes Resolving the Target AWS Region.",
         "tip": "Adhere to the Principle of Least Privilege and ensure all operational changes are automated in IaC pipelines.",
-        "activeNode": "nodeClient",
+        "activeNode": "nodeRegion",
         "status": "Step 1: Resolving Target AWS Region",
         "statusColor": "bg-blue-500",
-        "activePacket": "Local CLI → Environment: Set AWS_REGION"
+        "activePacket": "Local CLI → AWS Global: Resolve Target Region (us-east-1)"
       },
       {
         "id": 2,
@@ -41,7 +41,7 @@ const LABS_DATA = [
         "activeNode": "nodeVPC",
         "status": "Step 2: Querying Default VPC ID",
         "statusColor": "bg-emerald-500",
-        "activePacket": "CLI → EC2 API: DescribeVpcs (Query Default VPC)"
+        "activePacket": "CLI → EC2 API: DescribeVpcs (Query Default VPC 172.31.0.0/16)"
       },
       {
         "id": 3,
@@ -52,10 +52,10 @@ const LABS_DATA = [
         "description": "`aws ec2 describe-subnets` Calls the EC2 `DescribeSubnets` API endpoint.",
         "internal": "AWS Regional API Control Plane synchronizes hypervisor state and executes Querying the Target Subnet Identifier.",
         "tip": "Adhere to the Principle of Least Privilege and ensure all operational changes are automated in IaC pipelines.",
-        "activeNode": "nodeVPC",
+        "activeNode": "nodeSubnet",
         "status": "Step 3: Querying Target Subnet ID",
         "statusColor": "bg-amber-500",
-        "activePacket": "CLI → EC2 API: DescribeSubnets (Filter by VPC ID)"
+        "activePacket": "CLI → EC2 API: DescribeSubnets (Filter Subnets in VPC)"
       },
       {
         "id": 4,

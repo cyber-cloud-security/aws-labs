@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 05](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-25_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-05_%E2%80%94_High_Availability-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-25_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-05_%E2%80%94_High_Availability-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-05-ha-asg-alb/lab-02-alb-and-target-groups/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-05-ha-asg-alb/lab-04-asg-lifecycle-hooks/README.md)**
 
@@ -84,6 +84,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create a Launch Template for the ASG Fleet
+
+1. Query network parameters:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -98,16 +100,25 @@ SUBNET_2=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
   --query "Subnets[1].SubnetId" \
   --output text)
+```
 
+2. Resolve Amazon Linux 2023 AMI:
+```bash
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
+3. Encode User Data for installing `stress-ng`:
+```bash
 USERDATA_B64=$(echo -n '#!/bin/bash
 dnf install -y stress-ng
 echo "Worker Node Ready" > /tmp/ready.txt' | base64)
+```
 
-cat <<JSON > asg-template.json
+4. Create Launch Template JSON configuration:
+```bash
+cat << 'JSON' > asg-template.json
 {
   "ImageId": "${AMI_ID}",
   "InstanceType": "t3.micro",
@@ -127,7 +138,11 @@ cat <<JSON > asg-template.json
   ]
 }
 JSON
+sed -i.bak "s|\${AMI_ID}|${AMI_ID}|g; s|\${USERDATA_B64}|${USERDATA_B64}|g" asg-template.json && rm -f asg-template.json.bak
+```
 
+5. Create Launch Template:
+```bash
 TEMPLATE_ID=$(aws ec2 create-launch-template \
   --launch-template-name "asg-scaling-template" \
   --launch-template-data file://asg-template.json \
@@ -135,6 +150,8 @@ TEMPLATE_ID=$(aws ec2 create-launch-template \
 ```
 
 ### Step 2: Create the Auto Scaling Group
+
+1. Create ASG spanning both subnets:
 ```bash
 aws autoscaling create-auto-scaling-group \
   --auto-scaling-group-name "asg-dynamic-scaling-demo" \
@@ -145,13 +162,18 @@ aws autoscaling create-auto-scaling-group \
   --vpc-zone-identifier "${SUBNET_1},${SUBNET_2}" \
   --default-instance-warmup 60 \
   --tags "Key=Project,Value=ec2-master-labs,PropagateAtLaunch=true"
+```
 
-echo "Created ASG with DesiredCapacity=1."
+2. Confirm ASG creation:
+```bash
+echo "[SUCCESS] Created ASG with DesiredCapacity=1."
 ```
 
 ### Step 3: Attach Target Tracking Scaling Policy (CPU 50%)
+
+1. Create target tracking policy configuration:
 ```bash
-cat <<JSON > target-tracking.json
+cat << 'JSON' > target-tracking.json
 {
   "TargetValue": 50.0,
   "PredefinedMetricSpecification": {
@@ -160,15 +182,21 @@ cat <<JSON > target-tracking.json
   "DisableScaleIn": false
 }
 JSON
+```
 
+2. Put scaling policy on the ASG:
+```bash
 POLICY_ARN=$(aws autoscaling put-scaling-policy \
   --auto-scaling-group-name "asg-dynamic-scaling-demo" \
   --policy-name "cpu-50-target-tracking" \
   --policy-type "TargetTrackingScaling" \
   --target-tracking-configuration file://target-tracking.json \
   --query "PolicyARN" --output text)
+```
 
-echo "Attached Target Tracking Scaling Policy: ${POLICY_ARN}"
+3. Confirm policy attachment:
+```bash
+echo "[SUCCESS] Attached Target Tracking Scaling Policy: ${POLICY_ARN}"
 ```
 
 ---
@@ -185,7 +213,7 @@ echo "Active ASG Node: ${INSTANCE_ID}"
 ```
 
 ### 2. Inject 100% CPU Load via SSM Command
-Run `stress-ng` on the single running instance for 5 minutes to simulate heavy traffic:
+Run `stress-ng` on the single running instance for 5 minutes to simulate high traffic:
 ```bash
 aws ssm send-command \
   --instance-ids "${INSTANCE_ID}" \
@@ -201,37 +229,45 @@ aws autoscaling describe-scaling-activities \
   --query "Activities[0].[Description,Progress,StatusCode]" \
   --output table
 ```
-You will see: `Launching a new EC2 instance: i-xxxxxx`.
-Capacity will automatically jump to 2 or 3 instances!
+Capacity will automatically scale up to 2 or 3 instances.
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Update ASG desired capacity to 0:
 ```bash
-# 1. Update ASG to 0 instances for fast termination
 aws autoscaling update-auto-scaling-group \
   --auto-scaling-group-name "asg-dynamic-scaling-demo" \
   --min-size 0 \
   --desired-capacity 0
+```
 
-echo "Waiting for ASG instances to terminate..."
+2. Pause for instance termination:
+```bash
+echo "[INFO] Waiting 30 seconds for ASG instances to terminate..."
 sleep 30
+```
 
-# 2. Delete ASG
+3. Force delete ASG:
+```bash
 aws autoscaling delete-auto-scaling-group \
   --auto-scaling-group-name "asg-dynamic-scaling-demo" \
   --force-delete
+```
 
-# 3. Delete Launch Template
+4. Delete Launch Template and config files:
+```bash
 aws ec2 delete-launch-template --launch-template-id "${TEMPLATE_ID}"
 rm -f asg-template.json target-tracking.json
+```
 
-echo "Lab 5.3 clean-up completed successfully."
+5. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 5.3 clean-up completed successfully."
 ```
 
 ---

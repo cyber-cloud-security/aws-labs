@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 05](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-05_%E2%80%94_High_Availability-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-05_%E2%80%94_High_Availability-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-05-ha-asg-alb/lab-03-asg-dynamic-scaling/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-06-purchasing-cost-optimization/lab-01-spot-interruption-handling/README.md)**
 
@@ -76,6 +76,8 @@ stateDiagram-v2
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create an ASG with 1 Instance
+
+1. Query network and AMI parameters:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -90,22 +92,30 @@ SUBNET_1=$(aws ec2 describe-subnets \
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
-# Create Launch Template
-cat <<JSON > hook-lt.json
+2. Create Launch Template configuration:
+```bash
+cat << 'JSON' > hook-lt.json
 {
   "ImageId": "${AMI_ID}",
   "InstanceType": "t3.micro",
   "MetadataOptions": { "HttpTokens": "required" }
 }
 JSON
+sed -i.bak "s|\${AMI_ID}|${AMI_ID}|g" hook-lt.json && rm -f hook-lt.json.bak
+```
 
+3. Create Launch Template:
+```bash
 LT_ID=$(aws ec2 create-launch-template \
   --launch-template-name "lt-hook-demo" \
   --launch-template-data file://hook-lt.json \
   --query "LaunchTemplate.LaunchTemplateId" --output text)
+```
 
-# Create ASG
+4. Create Auto Scaling Group:
+```bash
 aws autoscaling create-auto-scaling-group \
   --auto-scaling-group-name "asg-hook-demo" \
   --launch-template "LaunchTemplateId=${LT_ID},Version=\$Latest" \
@@ -113,13 +123,17 @@ aws autoscaling create-auto-scaling-group \
   --max-size 1 \
   --desired-capacity 1 \
   --vpc-zone-identifier "${SUBNET_1}"
+```
 
-echo "Waiting for instance to launch..."
+5. Allow instance to initialize:
+```bash
+echo "[INFO] Waiting 20 seconds for instance to launch..."
 sleep 20
 ```
 
 ### Step 2: Attach Termination Lifecycle Hook
-Configure a 300-second pause when an instance is chosen for termination:
+
+1. Configure a 300-second pause when an instance is chosen for termination:
 ```bash
 aws autoscaling put-lifecycle-hook \
   --lifecycle-hook-name "graceful-drain-hook" \
@@ -127,8 +141,11 @@ aws autoscaling put-lifecycle-hook \
   --lifecycle-transition "autoscaling:EC2_INSTANCE_TERMINATING" \
   --heartbeat-timeout 300 \
   --default-result "CONTINUE"
+```
 
-echo "Configured termination lifecycle hook."
+2. Confirm hook attachment:
+```bash
+echo "[SUCCESS] Configured termination lifecycle hook."
 ```
 
 ---
@@ -136,61 +153,67 @@ echo "Configured termination lifecycle hook."
 ## 🔍 Verification & Drain Simulation
 
 ### 1. Trigger Scale-In / Termination
-Find the instance ID and terminate it via the ASG:
+1. Locate the running instance ID:
 ```bash
 INSTANCE_ID=$(aws autoscaling describe-auto-scaling-groups \
   --auto-scaling-group-names "asg-hook-demo" \
   --query "AutoScalingGroups[0].Instances[0].InstanceId" --output text)
+```
 
-echo "Triggering termination on: ${INSTANCE_ID}"
+2. Signal instance termination through ASG:
+```bash
 aws autoscaling terminate-instance-in-auto-scaling-group \
   --instance-id "${INSTANCE_ID}" \
   --should-decrement-desired-capacity
 ```
 
 ### 2. Observe `Terminating:Wait` Status
-Check the instance lifecycle state:
+Query the instance lifecycle state:
 ```bash
 aws autoscaling describe-auto-scaling-instances \
   --instance-ids "${INSTANCE_ID}" \
   --query "AutoScalingInstances[0].LifecycleState" --output text
 ```
-**Expected Output**: `Terminating:Wait`
-Notice the instance **remains powered on** and accessible! The ASG does not terminate it immediately.
+**Expected Output**: `Terminating:Wait` (The instance remains active allowing drainage routines).
 
 ### 3. Simulate Graceful Drainage and Complete Action
-Assume your cleanup script finishes flushing local logs and completes its work:
+Simulate completion of cleanup and signal the lifecycle action:
 ```bash
-echo "Cleanup script finished. Sending complete-lifecycle-action..."
-
 aws autoscaling complete-lifecycle-action \
   --lifecycle-hook-name "graceful-drain-hook" \
   --auto-scaling-group-name "asg-hook-demo" \
   --lifecycle-action-result "CONTINUE" \
   --instance-id "${INSTANCE_ID}"
+```
 
-echo "Lifecycle action signaled. Instance will now transition to Terminating:Proceed and terminate."
+Confirm action signaled:
+```bash
+echo "[SUCCESS] Lifecycle action signaled. Instance will now transition to Terminating:Proceed and terminate."
 ```
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Force delete the ASG:
 ```bash
-# 1. Delete ASG
 aws autoscaling delete-auto-scaling-group \
   --auto-scaling-group-name "asg-hook-demo" \
   --force-delete
+```
 
-# 2. Delete Launch Template
+2. Delete the Launch Template and clean files:
+```bash
 aws ec2 delete-launch-template --launch-template-id "${LT_ID}"
 rm -f hook-lt.json
+```
 
-echo "Lab 5.4 clean-up completed successfully."
+3. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 5.4 clean-up completed successfully."
 ```
 
 ---

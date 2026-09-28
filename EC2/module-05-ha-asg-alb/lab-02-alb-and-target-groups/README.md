@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 05](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Paid_%28~%240.05_--_%240.15%29-d29922?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-05_%E2%80%94_High_Availability-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Paid_%28~%240.05_--_%240.15%29-d29922?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-05_%E2%80%94_High_Availability-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-05-ha-asg-alb/lab-01-launch-templates/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-05-ha-asg-alb/lab-03-asg-dynamic-scaling/README.md)**
 
@@ -86,6 +86,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch Two Web Server Instances Across Separate AZs
+
+1. Query VPC and multi-AZ subnet IDs:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -101,12 +103,17 @@ SUBNET_2=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
   --query "Subnets[1].SubnetId" \
   --output text)
+```
 
+2. Resolve Amazon Linux 2023 AMI:
+```bash
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
-# Launch Node A (Subnet 1)
+3. Launch Node A in Subnet 1:
+```bash
 NODE_A_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
@@ -117,8 +124,10 @@ echo 'Server: NODE-A' > /usr/share/nginx/html/index.html
 systemctl start nginx" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=node-a}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
-# Launch Node B (Subnet 2)
+4. Launch Node B in Subnet 2:
+```bash
 NODE_B_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
@@ -129,19 +138,26 @@ echo 'Server: NODE-B' > /usr/share/nginx/html/index.html
 systemctl start nginx" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=node-b}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
-echo "Waiting for instances to boot..."
+5. Wait for both instances to enter running state:
+```bash
 aws ec2 wait instance-running --instance-ids "${NODE_A_ID}" "${NODE_B_ID}"
 ```
 
 ### Step 2: Create Security Group for ALB
+
+1. Create Security Group for the ALB:
 ```bash
 ALB_SG_ID=$(aws ec2 create-security-group \
   --group-name "alb-lab-sg" \
   --description "Inbound HTTP for Application Load Balancer" \
   --vpc-id "${VPC_ID}" \
   --query "GroupId" --output text)
+```
 
+2. Authorize HTTP ingress:
+```bash
 aws ec2 authorize-security-group-ingress \
   --group-id "${ALB_SG_ID}" \
   --protocol tcp \
@@ -150,6 +166,8 @@ aws ec2 authorize-security-group-ingress \
 ```
 
 ### Step 3: Create Target Group with Custom Health Check
+
+1. Create HTTP Target Group:
 ```bash
 TG_ARN=$(aws elbv2 create-target-group \
   --name "tg-ec2-labs" \
@@ -163,25 +181,37 @@ TG_ARN=$(aws elbv2 create-target-group \
   --unhealthy-threshold-count 2 \
   --target-type instance \
   --query "TargetGroups[0].TargetGroupArn" --output text)
+```
 
-# Set Deregistration Delay to 30 seconds for fast draining in labs:
+2. Configure 30-second deregistration delay for fast draining in lab environments:
+```bash
 aws elbv2 modify-target-group-attributes \
   --target-group-arn "${TG_ARN}" \
   --attributes "Key=deregistration_delay.timeout_seconds,Value=30"
+```
 
-echo "Created Target Group: ${TG_ARN}"
+3. Confirm Target Group creation:
+```bash
+echo "[SUCCESS] Created Target Group: ${TG_ARN}"
 ```
 
 ### Step 4: Register Instances to Target Group
+
+1. Register Node A and Node B:
 ```bash
 aws elbv2 register-targets \
   --target-group-arn "${TG_ARN}" \
   --targets "Id=${NODE_A_ID}" "Id=${NODE_B_ID}"
+```
 
-echo "Registered nodes with Target Group."
+2. Confirm registration:
+```bash
+echo "[SUCCESS] Registered nodes with Target Group."
 ```
 
 ### Step 5: Provision Application Load Balancer & Listener
+
+1. Create Application Load Balancer:
 ```bash
 ALB_ARN=$(aws elbv2 create-load-balancer \
   --name "alb-ec2-labs" \
@@ -190,23 +220,33 @@ ALB_ARN=$(aws elbv2 create-load-balancer \
   --scheme internet-facing \
   --type application \
   --query "LoadBalancers[0].LoadBalancerArn" --output text)
+```
 
-echo "Waiting for ALB to become active..."
+2. Wait for ALB to become available:
+```bash
 aws elbv2 wait load-balancer-available --load-balancer-arns "${ALB_ARN}"
+```
 
-# Create Listener forwarding to Target Group
+3. Create HTTP Listener forwarding traffic to the Target Group:
+```bash
 LISTENER_ARN=$(aws elbv2 create-listener \
   --load-balancer-arn "${ALB_ARN}" \
   --protocol HTTP \
   --port 80 \
   --default-actions "Type=forward,TargetGroupArn=${TG_ARN}" \
   --query "Listeners[0].ListenerArn" --output text)
+```
 
+4. Retrieve the ALB DNS Name:
+```bash
 ALB_DNS=$(aws elbv2 describe-load-balancers \
   --load-balancer-arns "${ALB_ARN}" \
   --query "LoadBalancers[0].DNSName" --output text)
+```
 
-echo "ALB Ready at: http://${ALB_DNS}"
+5. Display active endpoint:
+```bash
+echo "[SUCCESS] ALB Ready at: http://${ALB_DNS}"
 ```
 
 ---
@@ -220,46 +260,51 @@ aws elbv2 describe-target-health \
   --query "TargetHealthDescriptions[*].[Target.Id,TargetHealth.State]" \
   --output table
 ```
-Wait until both targets display `healthy`.
 
 ### 2. Test Load Balancing Distribution
-Send repeated curl requests to the ALB DNS name:
+Send repeated curl requests to the ALB DNS endpoint:
 ```bash
 for i in {1..6}; do
   curl -s "http://${ALB_DNS}"
 done
 ```
-**Expected Output**: Alternating responses:
+
+**Expected Output**: Alternating responses from both instances:
 ```text
 Server: NODE-A
 Server: NODE-B
 Server: NODE-A
 Server: NODE-B
-...
 ```
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Delete ALB and Listener:
 ```bash
-# 1. Delete ALB and Listener
 aws elbv2 delete-load-balancer --load-balancer-arn "${ALB_ARN}"
 sleep 10
 aws elbv2 delete-target-group --target-group-arn "${TG_ARN}"
+```
 
-# 2. Terminate instances
+2. Terminate EC2 instances:
+```bash
 aws ec2 terminate-instances --instance-ids "${NODE_A_ID}" "${NODE_B_ID}"
 aws ec2 wait instance-terminated --instance-ids "${NODE_A_ID}" "${NODE_B_ID}"
+```
 
-# 3. Delete Security Group
+3. Delete Security Group:
+```bash
 aws ec2 delete-security-group --group-id "${ALB_SG_ID}"
+```
 
-echo "Lab 5.2 clean-up completed successfully."
+4. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 5.2 clean-up completed successfully."
 ```
 
 ---

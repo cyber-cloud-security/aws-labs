@@ -79,7 +79,8 @@ stateDiagram-v2
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch an Instance with Hibernation Enabled
-We fetch the default subnet and an Amazon Linux 2023 x86_64 AMI:
+
+1. Discover network identifiers and query the Amazon Linux 2023 x86_64 AMI:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -96,10 +97,7 @@ AMI_ID=$(aws ssm get-parameter \
   --query "Parameter.Value" --output text)
 ```
 
-Launch the instance with:
-- `--hibernation-options Configured=true`
-- Root EBS volume encrypted with default AWS KMS key (`Encrypted=true`)
-- Size: 10 GiB (sufficient to hold OS + memory dump):
+2. Launch the EC2 instance with hibernation configured and encrypted root volume:
 ```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
@@ -119,19 +117,28 @@ INSTANCE_ID=$(aws ec2 run-instances \
   ]' \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=ec2-hibernation-node}]" \
   --query "Instances[0].InstanceId" --output text)
-
-echo "Launched Hibernation Instance: ${INSTANCE_ID}"
-aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
 
+3. Confirm launched instance and wait until running:
+```bash
+echo "Launched Hibernation Instance: ${INSTANCE_ID}"
+aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
+echo "[SUCCESS] Instance ${INSTANCE_ID} is now running."
+```
+
+---
+
 ### Step 2: Enable Termination Protection
-Prevent accidental termination via AWS Console or CLI:
+
+1. Enable termination protection attribute:
 ```bash
 aws ec2 modify-instance-attribute \
   --instance-id "${INSTANCE_ID}" \
   --disable-api-termination "{\"Value\": true}"
+```
 
-# Verify attribute
+2. Verify that termination protection is active:
+```bash
 aws ec2 describe-instance-attribute \
   --instance-id "${INSTANCE_ID}" \
   --attribute disableApiTermination
@@ -147,7 +154,9 @@ Attempt to terminate the instance:
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 ```
 **Expected Output**: An API error:
-`An error occurred (OperationNotPermitted) when calling the TerminateInstances operation: The instance 'i-xxxx' may not be terminated. Modify its 'disableApiTermination' instance attribute and try again.`
+```text
+An error occurred (OperationNotPermitted) when calling the TerminateInstances operation: The instance 'i-xxxx' may not be terminated. Modify its 'disableApiTermination' instance attribute and try again.
+```
 
 ### 2. Verify Hibernation Capability
 Check the instance description:
@@ -159,12 +168,12 @@ aws ec2 describe-instances \
 It must return `True`.
 
 ### 3. Initiate Hibernation
-Now initiate the hibernate call:
+1. Send the stop-instances command with the `--hibernate` flag:
 ```bash
 aws ec2 stop-instances --instance-ids "${INSTANCE_ID}" --hibernate
-echo "Initiated hibernation..."
 ```
-Monitor the state transition:
+
+2. Monitor the instance state transition:
 ```bash
 aws ec2 describe-instances \
   --instance-ids "${INSTANCE_ID}" \
@@ -174,33 +183,40 @@ The state will transition from `running` -> `stopping` -> `stopped`.
 Unlike a regular stop, the kernel freezes processes and dumps the dirty memory pages to the swap/hibernation partition on the encrypted root EBS volume.
 
 ### 4. Wake / Resume the Instance
-Start the instance back up:
+1. Start the instance back up:
 ```bash
 aws ec2 start-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
-echo "Instance resumed from hibernation!"
+```
+
+2. Confirm resumed state:
+```bash
+echo "[SUCCESS] Instance resumed from hibernation!"
 ```
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
-To clean up, you must first disable termination protection:
+1. Disable termination protection:
 ```bash
-# 1. Disable termination protection
 aws ec2 modify-instance-attribute \
   --instance-id "${INSTANCE_ID}" \
   --disable-api-termination "{\"Value\": false}"
+```
 
-# 2. Terminate the instance
+2. Terminate the instance and wait for termination:
+```bash
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
+```
 
-echo "Lab 1.2 clean-up completed successfully."
+3. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 1.2 clean-up completed successfully."
 ```
 
 ---

@@ -92,6 +92,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch a Base Instance with Pre-Installed Tools
+
+1. Set target regions and discover AMI and network identifiers:
 ```bash
 export AWS_REGION="us-east-1"
 export DEST_REGION="us-west-2"
@@ -111,14 +113,19 @@ SUBNET_ID=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
   --query "Subnets[0].SubnetId" \
   --output text)
+```
 
-# Create the bootstrap script for the Golden Image
+2. Create the bootstrap script for the Golden Image:
+```bash
 cat << 'EOF' > userdata.sh
 #!/bin/bash
 dnf install -y htop git tmux
 echo 'Golden Image Base Build 1.0' > /etc/golden-image-version
 EOF
+```
 
+3. Launch the base instance:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --region "${AWS_REGION}" \
   --image-id "${AMI_ID}" \
@@ -127,13 +134,20 @@ INSTANCE_ID=$(aws ec2 run-instances \
   --user-data file://userdata.sh \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=golden-image-base}]" \
   --query "Instances[0].InstanceId" --output text)
-
-echo "Launched Base Instance: ${INSTANCE_ID}"
-aws ec2 wait instance-running --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}"
 ```
 
+4. Confirm launched instance and wait until running:
+```bash
+echo "Launched Base Instance: ${INSTANCE_ID}"
+aws ec2 wait instance-running --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}"
+echo "[SUCCESS] Base instance is running."
+```
+
+---
+
 ### Step 2: Create the Custom AMI
-Create the custom AMI from the running instance:
+
+1. Trigger AMI creation from the base instance:
 ```bash
 CUSTOM_AMI_ID=$(aws ec2 create-image \
   --region "${AWS_REGION}" \
@@ -143,14 +157,19 @@ CUSTOM_AMI_ID=$(aws ec2 create-image \
   --no-reboot \
   --tag-specifications "ResourceType=image,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=golden-al2023-v1}]" \
   --query "ImageId" --output text)
-
-echo "Created AMI: ${CUSTOM_AMI_ID}"
-echo "Waiting for AMI to reach 'available' state (takes 2-3 mins)..."
-aws ec2 wait image-available --region "${AWS_REGION}" --image-ids "${CUSTOM_AMI_ID}"
-echo "AMI ${CUSTOM_AMI_ID} is ready!"
 ```
 
+2. Wait for the custom AMI to reach `available` state:
+```bash
+echo "Created AMI: ${CUSTOM_AMI_ID}"
+aws ec2 wait image-available --region "${AWS_REGION}" --image-ids "${CUSTOM_AMI_ID}"
+echo "[SUCCESS] AMI ${CUSTOM_AMI_ID} is ready!"
+```
+
+---
+
 ### Step 3: Inspect AMI Block Device Mappings and Snapshot IDs
+
 Identify the snapshot backing this AMI:
 ```bash
 SNAPSHOT_ID=$(aws ec2 describe-images \
@@ -161,8 +180,11 @@ SNAPSHOT_ID=$(aws ec2 describe-images \
 echo "Underlying Snapshot ID: ${SNAPSHOT_ID}"
 ```
 
+---
+
 ### Step 4: Copy AMI Cross-Region
-Copy the AMI to `us-west-2` with destination encryption:
+
+1. Copy the AMI to `us-west-2` with destination KMS encryption:
 ```bash
 COPIED_AMI_ID=$(aws ec2 copy-image \
   --source-region "${AWS_REGION}" \
@@ -172,7 +194,10 @@ COPIED_AMI_ID=$(aws ec2 copy-image \
   --description "Cross-region replica of Golden AMI" \
   --encrypted \
   --query "ImageId" --output text)
+```
 
+2. Confirm copied AMI identifier:
+```bash
 echo "Copied AMI to ${DEST_REGION}: ${COPIED_AMI_ID}"
 ```
 
@@ -181,7 +206,7 @@ echo "Copied AMI to ${DEST_REGION}: ${COPIED_AMI_ID}"
 ## 🔍 Verification & Testing
 
 ### 1. Launch a Test Instance from the Custom AMI
-Verify that instances launched from this AMI boot instantly with the pre-baked packages:
+1. Launch an instance using the custom AMI:
 ```bash
 TEST_NODE_ID=$(aws ec2 run-instances \
   --region "${AWS_REGION}" \
@@ -190,41 +215,57 @@ TEST_NODE_ID=$(aws ec2 run-instances \
   --subnet-id "${SUBNET_ID}" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=test-ami-instance}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
+2. Confirm launch and wait until running:
+```bash
 echo "Launched Node from Custom AMI: ${TEST_NODE_ID}"
 aws ec2 wait instance-running --region "${AWS_REGION}" --instance-ids "${TEST_NODE_ID}"
+echo "[SUCCESS] Test instance from custom AMI is running."
 ```
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
-To avoid leftover snapshot storage charges, follow the strict two-step purge:
+1. Terminate test and base instances and wait for termination:
 ```bash
-# 1. Terminate test and base instances
 aws ec2 terminate-instances \
   --region "${AWS_REGION}" \
   --instance-ids "${INSTANCE_ID}" "${TEST_NODE_ID}"
 aws ec2 wait instance-terminated --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}" "${TEST_NODE_ID}"
+```
 
-# 2. Deregister AMI in primary region
+2. Deregister AMI in primary region:
+```bash
 aws ec2 deregister-image --region "${AWS_REGION}" --image-id "${CUSTOM_AMI_ID}"
+```
 
-# 3. Delete underlying snapshot in primary region
+3. Delete underlying snapshot in primary region:
+```bash
 aws ec2 delete-snapshot --region "${AWS_REGION}" --snapshot-id "${SNAPSHOT_ID}"
+```
 
-# 4. Deregister copied AMI and delete snapshot in destination region
+4. Deregister copied AMI and delete snapshot in destination region:
+```bash
 DEST_SNAPSHOT_ID=$(aws ec2 describe-images --region "${DEST_REGION}" --image-ids "${COPIED_AMI_ID}" --query "Images[0].BlockDeviceMappings[0].Ebs.SnapshotId" --output text 2>/dev/null || echo "")
 aws ec2 deregister-image --region "${DEST_REGION}" --image-id "${COPIED_AMI_ID}"
 if [[ -n "${DEST_SNAPSHOT_ID}" && "${DEST_SNAPSHOT_ID}" != "None" ]]; then
   aws ec2 delete-snapshot --region "${DEST_REGION}" --snapshot-id "${DEST_SNAPSHOT_ID}"
 fi
+```
 
-echo "Lab 1.3 clean-up completed successfully."
+5. Clean up local temporary files:
+```bash
+rm -f userdata.sh
+```
+
+6. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 1.3 clean-up completed successfully."
 ```
 
 ---

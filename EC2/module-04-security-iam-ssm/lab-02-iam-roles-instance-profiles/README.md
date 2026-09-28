@@ -82,8 +82,10 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create the IAM Role and Trust Policy
+
+1. Create the EC2 trust policy document:
 ```bash
-cat <<JSON > ec2-trust-policy.json
+cat << 'EOF' > ec2-trust-policy.json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -94,35 +96,51 @@ cat <<JSON > ec2-trust-policy.json
     }
   ]
 }
-JSON
+EOF
+```
 
+2. Create the IAM Role:
+```bash
 aws iam create-role \
   --role-name "ec2-labs-s3-reader-role" \
   --assume-role-policy-document file://ec2-trust-policy.json
+```
 
-# Attach S3 Read Only Policy
+3. Attach the AmazonS3ReadOnlyAccess managed policy:
+```bash
 aws iam attach-role-policy \
   --role-name "ec2-labs-s3-reader-role" \
   --policy-arn "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
 ```
 
+---
+
 ### Step 2: Create the IAM Instance Profile & Add the Role
+
+1. Create the Instance Profile wrapper:
 ```bash
-# 1. Create Instance Profile
 aws iam create-instance-profile \
   --instance-profile-name "ec2-labs-s3-reader-profile"
+```
 
-# 2. Add Role to Instance Profile
+2. Add the IAM Role to the Instance Profile:
+```bash
 aws iam add-role-to-instance-profile \
   --instance-profile-name "ec2-labs-s3-reader-profile" \
   --role-name "ec2-labs-s3-reader-role"
+```
 
-echo "Created and populated Instance Profile."
-# Sleep 10s for IAM propagation
+3. Confirm creation and allow for IAM propagation:
+```bash
+echo "[SUCCESS] Created and populated Instance Profile."
 sleep 10
 ```
 
+---
+
 ### Step 3: Launch an EC2 Instance Without Keys or Profile
+
+1. Discover network parameters and AMI:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -137,26 +155,40 @@ export SUBNET_ID=$(aws ec2 describe-subnets \
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
+2. Launch the EC2 instance without hardcoded credentials:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
   --subnet-id "${SUBNET_ID}" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=iam-role-demo}]" \
   --query "Instances[0].InstanceId" --output text)
-
-aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
 
+3. Wait for the instance to enter running state:
+```bash
+echo "Waiting for instance ${INSTANCE_ID} to run..."
+aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
+echo "[SUCCESS] Instance ${INSTANCE_ID} is running."
+```
+
+---
+
 ### Step 4: Attach the Instance Profile Live
-Attach the instance profile to the already running instance:
+
+1. Attach the instance profile to the already running instance:
 ```bash
 ASSOC_ID=$(aws ec2 associate-iam-instance-profile \
   --instance-id "${INSTANCE_ID}" \
   --iam-instance-profile "Name=ec2-labs-s3-reader-profile" \
   --query "IamInstanceProfileAssociation.AssociationId" --output text)
+```
 
-echo "Associated Instance Profile Live! Association ID: ${ASSOC_ID}"
+2. Confirm live association:
+```bash
+echo "[SUCCESS] Associated Instance Profile Live! Association ID: ${ASSOC_ID}"
 ```
 
 ---
@@ -168,21 +200,8 @@ Connect to the instance and execute:
 ```bash
 TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
 
-# Fetch IAM Role credentials:
 curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
   http://169.254.169.254/latest/meta-data/iam/security-credentials/ec2-labs-s3-reader-role
-```
-**Sample Output**:
-```json
-{
-  "Code": "Success",
-  "LastUpdated": "2026-09-18T01:30:00Z",
-  "Type": "AWS-HMAC",
-  "AccessKeyId": "ASIAEXAMPLEKEYID...",
-  "SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-  "Token": "IQoJb3JpZ2luX2VjE...",
-  "Expiration": "2026-09-18T07:30:00Z"
-}
 ```
 
 ### 2. Run AWS S3 Commands Without Hardcoded Config
@@ -196,29 +215,39 @@ The command succeeds immediately using the IAM role credentials with zero config
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Terminate the instance and wait for termination:
 ```bash
-# 1. Terminate instance
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
+```
 
-# 2. Remove role from instance profile & delete profile
+2. Remove role from instance profile and delete the instance profile:
+```bash
 aws iam remove-role-from-instance-profile \
   --instance-profile-name "ec2-labs-s3-reader-profile" \
   --role-name "ec2-labs-s3-reader-role"
 aws iam delete-instance-profile --instance-profile-name "ec2-labs-s3-reader-profile"
+```
 
-# 3. Detach policy and delete role
+3. Detach policy and delete the IAM role:
+```bash
 aws iam detach-role-policy \
   --role-name "ec2-labs-s3-reader-role" \
   --policy-arn "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
 aws iam delete-role --role-name "ec2-labs-s3-reader-role"
-rm -f ec2-trust-policy.json
+```
 
-echo "Lab 4.2 clean-up completed successfully."
+4. Clean up local temporary files:
+```bash
+rm -f ec2-trust-policy.json
+```
+
+5. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 4.2 clean-up completed successfully."
 ```
 
 ---

@@ -2,9 +2,12 @@
 
 # 🛡️ Module 04: Security, IAM & Zero-Trust Governance
 
-**[🏠 AWS Labs Root](../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Master Curriculum](../README.md)**
+**[🏠 AWS Labs Root](../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Master Curriculum](../README.md)** &nbsp;•&nbsp; **[⚙️ Module 00 Prerequisites](../module-00-prerequisites/README.md)**
 
-![🧪 Labs](https://img.shields.io/badge/%F0%9F%A7%AA_Labs-4_Hands--On_Labs-0969da?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![⚙️ Focus](https://img.shields.io/badge/%E2%9A%99%EF%B8%8F_Focus-IAM_%7C_Security_Groups_%7C_NACL_%7C_SSM_%7C_IMDSv2-FF9900?style=flat-square)
+![🧪 Labs](https://img.shields.io/badge/🧪_Labs-4_Hands--On_Labs-539bf5?style=flat-square)
+![🎯 Level](https://img.shields.io/badge/🎯_Level-Intermediate_to_Advanced-8250df?style=flat-square)
+![⚙️ Focus](https://img.shields.io/badge/⚙️_Focus-IAM_%7C_Security_Groups_%7C_NACL_%7C_SSM_%7C_IMDSv2-f69d50?style=flat-square)
+![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Module 03](../module-03-networking-eni-placement/README.md)** &nbsp;|&nbsp; **[➡️ Module 05](../module-05-ha-asg-alb/README.md)**
 

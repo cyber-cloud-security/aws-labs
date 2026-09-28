@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 04](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-04_%E2%80%94_Security-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-04_%E2%80%94_Security-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-04-security-iam-ssm/lab-02-iam-roles-instance-profiles/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-04-security-iam-ssm/lab-04-ssm-session-manager/README.md)**
 
@@ -80,6 +80,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch an Instance with IMDSv1 Enabled (Default/Legacy Mode)
+
+1. Query your default network infrastructure:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -90,11 +92,17 @@ export SUBNET_ID=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
   --query "Subnets[0].SubnetId" \
   --output text)
+```
 
+2. Resolve the latest Amazon Linux 2023 AMI:
+```bash
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
+3. Launch an EC2 instance with `HttpTokens=optional`:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
@@ -102,16 +110,20 @@ INSTANCE_ID=$(aws ec2 run-instances \
   --metadata-options "HttpEndpoint=enabled,HttpTokens=optional" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=imdsv1-vulnerable}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
+4. Wait for the instance to reach running state:
+```bash
 aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
 
 ### Step 2: Test Legacy IMDSv1 Access Inside the Instance
-Connect to the instance:
+
+1. Connect to the instance and execute an unauthenticated IMDSv1 GET request:
 ```bash
-# Execute an unauthenticated IMDSv1 GET request:
 curl -i -s http://169.254.169.254/latest/meta-data/instance-id
 ```
+
 **Result**: HTTP `200 OK`, returning the instance ID directly without authentication tokens.
 
 ---
@@ -119,39 +131,52 @@ curl -i -s http://169.254.169.254/latest/meta-data/instance-id
 ## 🔍 Hardening: Enforce IMDSv2
 
 ### Step 3: Modify Instance Metadata Options Live
-From your administrative terminal:
+
+1. From your administrative terminal, enforce IMDSv2 token requirements and hop limit:
 ```bash
 aws ec2 modify-instance-metadata-options \
   --instance-id "${INSTANCE_ID}" \
   --http-tokens required \
   --http-put-response-hop-limit 1 \
   --http-endpoint enabled
+```
 
-echo "Enforced IMDSv2 on instance ${INSTANCE_ID}."
+2. Confirm configuration update:
+```bash
+echo "[SUCCESS] Enforced IMDSv2 on instance ${INSTANCE_ID}."
 ```
 
 ### Step 4: Verify SSRF Mitigation
-Inside the instance, repeat the legacy IMDSv1 call:
+
+1. Inside the instance, repeat the legacy unauthenticated IMDSv1 call:
 ```bash
 curl -i -s http://169.254.169.254/latest/meta-data/instance-id
 ```
+
 **Result**:
-`HTTP/1.1 401 Unauthorized`
-The unauthenticated metadata request is instantly blocked by the hypervisor!
+```text
+HTTP/1.1 401 Unauthorized
+```
+The unauthenticated metadata request is instantly blocked by the hypervisor.
 
 ### Step 5: Test the Proper IMDSv2 Flow
-Acquire an authenticated session token via HTTP PUT:
+
+1. Acquire an authenticated session token via HTTP PUT:
 ```bash
 TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
   -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+```
 
-# Access metadata with signed header:
+2. Access metadata with the signed session token header:
+```bash
 curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id
 ```
+
 **Result**: Returns the instance ID securely.
 
 ### Step 6: Account-Wide Default Hardening (Bonus)
-To guarantee that all future EC2 instances launched in your region require IMDSv2 by default:
+
+1. Enforce IMDSv2 account-wide for all future EC2 launches in the current region:
 ```bash
 aws ec2 modify-instance-metadata-defaults \
   --http-tokens required \
@@ -162,14 +187,22 @@ aws ec2 modify-instance-metadata-defaults \
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Terminate the test instance:
 ```bash
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
+```
+
+2. Wait for instance termination:
+```bash
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
-echo "Lab 4.3 clean-up completed successfully."
+```
+
+3. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 4.3 clean-up completed successfully."
 ```
 
 ---

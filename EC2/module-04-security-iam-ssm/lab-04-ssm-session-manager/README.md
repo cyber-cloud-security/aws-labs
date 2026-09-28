@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 04](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-04_%E2%80%94_Security-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-04_%E2%80%94_Security-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-04-security-iam-ssm/lab-03-imdsv2-hardening/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-05-ha-asg-alb/lab-01-launch-templates/README.md)**
 
@@ -86,6 +86,8 @@ flowchart LR
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create IAM Role for SSM Session Manager
+
+1. Set environment variables:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -96,9 +98,11 @@ export SUBNET_ID=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
   --query "Subnets[0].SubnetId" \
   --output text)
+```
 
-# 1. Create Trust Policy
-cat <<JSON > ssm-trust.json
+2. Create the EC2 assume role trust policy:
+```bash
+cat << 'JSON' > ssm-trust.json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -110,42 +114,58 @@ cat <<JSON > ssm-trust.json
   ]
 }
 JSON
+```
 
+3. Create the IAM role:
+```bash
 aws iam create-role \
   --role-name "ec2-ssm-core-role" \
   --assume-role-policy-document file://ssm-trust.json 2>/dev/null || true
+```
 
-# 2. Attach AWS-managed policy
+4. Attach the AWS-managed SSM policy:
+```bash
 aws iam attach-role-policy \
   --role-name "ec2-ssm-core-role" \
   --policy-arn "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+```
 
-# 3. Create Instance Profile
+5. Create the instance profile and associate the role:
+```bash
 aws iam create-instance-profile --instance-profile-name "ec2-ssm-core-profile" 2>/dev/null || true
 aws iam add-role-to-instance-profile \
   --instance-profile-name "ec2-ssm-core-profile" \
   --role-name "ec2-ssm-core-role" 2>/dev/null || true
-
 sleep 10
 ```
 
 ### Step 2: Create a Security Group with ZERO Inbound Rules
+
+1. Create a fully locked-down security group:
 ```bash
 LOCKED_SG_ID=$(aws ec2 create-security-group \
   --group-name "sg-locked-down" \
   --description "Zero inbound ports allowed" \
   --vpc-id "${VPC_ID}" \
   --query "GroupId" --output text)
+```
 
-echo "Created locked Security Group: ${LOCKED_SG_ID}"
+2. Confirm creation:
+```bash
+echo "[SUCCESS] Created locked Security Group: ${LOCKED_SG_ID}"
 ```
 
 ### Step 3: Launch Instance with SSM Profile and Locked SG
+
+1. Fetch latest Amazon Linux 2023 AMI:
 ```bash
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
+2. Launch the zero-SSH instance with Nginx via User Data:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
@@ -158,11 +178,12 @@ echo 'Private internal portal reachable only via SSM Port Forwarding' > /usr/sha
 systemctl start nginx" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=zero-ssh-host}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
-echo "Launched zero-SSH host: ${INSTANCE_ID}"
+3. Wait for instance to enter running state:
+```bash
 aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
-
-echo "Waiting 60 seconds for SSM Agent to register with AWS..."
+echo "[INFO] Waiting 60 seconds for SSM Agent to register with AWS..."
 sleep 60
 ```
 
@@ -175,14 +196,7 @@ From your local terminal, initiate an interactive shell session:
 ```bash
 aws ssm start-session --target "${INSTANCE_ID}"
 ```
-You are immediately dropped into a bash prompt as `ssm-user`:
-```bash
-# sh-5.2$ whoami
-# ssm-user
-# sh-5.2$ sudo su -
-# [root@ip-172-31-x-x ~]#
-```
-Exit the session by typing `exit`.
+You are immediately dropped into a bash prompt as `ssm-user`. Exit the session by typing `exit`.
 
 ### 2. Tunnel Private Web Traffic via SSM Port Forwarding
 Without opening any firewall ports or assigning a public IP, tunnel the instance's private port 80 to your local workstation port 8080:
@@ -192,6 +206,7 @@ aws ssm start-session \
   --document-name "AWS-StartPortForwardingSession" \
   --parameters '{"portNumber":["80"],"localPortNumber":["8080"]}'
 ```
+
 In another terminal window or your browser, test the tunnel:
 ```bash
 curl http://localhost:8080
@@ -204,25 +219,28 @@ If your legacy tooling requires native SSH/SCP/rsync, configure `~/.ssh/config`:
 host i-* mi-*
     ProxyCommand sh -c "aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters 'portNumber=%p'"
 ```
-You can then run `ssh ec2-user@<instance-id>` transparently through the encrypted SSM tunnel!
+You can then run `ssh ec2-user@<instance-id>` transparently through the encrypted SSM tunnel.
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Terminate the instance:
 ```bash
-# 1. Terminate instance
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
+```
 
-# 2. Delete locked security group
+2. Delete the locked security group:
+```bash
 aws ec2 delete-security-group --group-id "${LOCKED_SG_ID}"
+```
 
-# 3. Clean up IAM roles
+3. Detach policies and delete IAM instance profile and role:
+```bash
 aws iam remove-role-from-instance-profile \
   --instance-profile-name "ec2-ssm-core-profile" \
   --role-name "ec2-ssm-core-role"
@@ -232,8 +250,11 @@ aws iam detach-role-policy \
   --policy-arn "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 aws iam delete-role --role-name "ec2-ssm-core-role"
 rm -f ssm-trust.json
+```
 
-echo "Lab 4.4 clean-up completed successfully."
+4. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 4.4 clean-up completed successfully."
 ```
 
 ---

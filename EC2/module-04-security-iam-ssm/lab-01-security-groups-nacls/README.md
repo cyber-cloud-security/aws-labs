@@ -83,57 +83,77 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create Two Chained Security Groups
+
 We will create a Tier-1 "Bastion/Proxy" SG and a Tier-2 "Application" SG:
+
+1. Discover default VPC:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
   --filters "Name=isDefault,Values=true" \
   --query "Vpcs[0].VpcId" \
   --output text)
+```
 
-# 1. Front-end SG
+2. Create the Front-end Security Group:
+```bash
 FRONTEND_SG=$(aws ec2 create-security-group \
   --group-name "sg-frontend-lb" \
   --description "Simulated Load Balancer / Proxy SG" \
   --vpc-id "${VPC_ID}" \
   --query "GroupId" --output text)
+```
 
-# 2. Back-end SG
+3. Create the Back-end Application Security Group:
+```bash
 BACKEND_SG=$(aws ec2 create-security-group \
   --group-name "sg-backend-app" \
   --description "Application Backend SG" \
   --vpc-id "${VPC_ID}" \
   --query "GroupId" --output text)
+```
 
-# Allow HTTP from 0.0.0.0/0 to FRONTEND_SG
+4. Allow inbound HTTP traffic on Port 80 from `0.0.0.0/0` to `FRONTEND_SG`:
+```bash
 aws ec2 authorize-security-group-ingress \
   --group-id "${FRONTEND_SG}" \
   --protocol tcp \
   --port 80 \
   --cidr 0.0.0.0/0
+```
 
-# CHAINING: Authorize BACKEND_SG to accept traffic ONLY from FRONTEND_SG ID
+5. Configure Security Group Chaining (authorize `BACKEND_SG` to accept traffic ONLY from `FRONTEND_SG`):
+```bash
 aws ec2 authorize-security-group-ingress \
   --group-id "${BACKEND_SG}" \
   --protocol tcp \
   --port 80 \
   --source-group "${FRONTEND_SG}"
-
-echo "Configured SG Chaining: ${BACKEND_SG} only trusts ${FRONTEND_SG}"
 ```
 
+6. Confirm configured Security Group Chaining:
+```bash
+echo "[SUCCESS] Configured SG Chaining: ${BACKEND_SG} only trusts ${FRONTEND_SG}"
+```
+
+---
+
 ### Step 2: Create a Custom Network ACL & Understand Stateless Ephemeral Ports
-Create a NACL:
+
+1. Create a custom Network ACL:
 ```bash
 NACL_ID=$(aws ec2 create-network-acl \
   --vpc-id "${VPC_ID}" \
   --tag-specifications "ResourceType=network-acl,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=demo-nacl}]" \
   --query "NetworkAcl.NetworkAclId" --output text)
+```
 
+2. Confirm created NACL:
+```bash
 echo "Created NACL: ${NACL_ID}"
 ```
 
-Add Inbound Rule 100 allowing Port 80:
+3. Add Inbound Rule 100 allowing Port 80:
 ```bash
 aws ec2 create-network-acl-entry \
   --network-acl-id "${NACL_ID}" \
@@ -150,7 +170,7 @@ aws ec2 create-network-acl-entry \
 > Because NACLs are stateless, when the server sends the HTTP response packet back to the client, the client's destination port is a random ephemeral port (e.g., 52341).
 > You must create an outbound NACL rule for ports **1024–65535**:
 
-Add Outbound Rule 100 for Ephemeral Ports:
+4. Add Outbound Rule 100 for Ephemeral Ports (1024–65535):
 ```bash
 aws ec2 create-network-acl-entry \
   --network-acl-id "${NACL_ID}" \
@@ -160,8 +180,11 @@ aws ec2 create-network-acl-entry \
   --egress \
   --cidr-block 0.0.0.0/0 \
   --port-range From=1024,To=65535
+```
 
-echo "NACL configured with stateless inbound :80 and outbound ephemeral :1024-65535."
+5. Confirm NACL rule configuration:
+```bash
+echo "[SUCCESS] NACL configured with stateless inbound :80 and outbound ephemeral :1024-65535."
 ```
 
 ---
@@ -169,14 +192,17 @@ echo "NACL configured with stateless inbound :80 and outbound ephemeral :1024-65
 ## 🔍 Verification & Testing
 
 Inspect the rules of both components:
+
+1. Verify Security Group rules:
 ```bash
-# Verify Security Group rules:
 aws ec2 describe-security-group-rules \
   --filters "Name=group-id,Values=${BACKEND_SG}" \
   --query "SecurityGroupRules[*].[GroupId,IsEgress,IpProtocol,FromPort,ToPort,ReferencedGroupInfo.GroupId]" \
   --output table
+```
 
-# Verify NACL rules:
+2. Verify NACL rules:
+```bash
 aws ec2 describe-network-acls \
   --network-acl-ids "${NACL_ID}" \
   --query "NetworkAcls[0].Entries[*].[RuleNumber,RuleAction,Egress,Protocol,CidrBlock,PortRange]" \
@@ -187,25 +213,32 @@ aws ec2 describe-network-acls \
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Delete the custom Network ACL:
 ```bash
-# 1. Delete NACL
 aws ec2 delete-network-acl --network-acl-id "${NACL_ID}"
+```
 
-# 2. Delete Security Groups (must delete ingress rule before deleting referenced SG)
+2. Revoke Security Group chaining rule (must revoke ingress rule before deleting referenced SG):
+```bash
 aws ec2 revoke-security-group-ingress \
   --group-id "${BACKEND_SG}" \
   --protocol tcp \
   --port 80 \
   --source-group "${FRONTEND_SG}"
+```
 
+3. Delete both Security Groups:
+```bash
 aws ec2 delete-security-group --group-id "${BACKEND_SG}"
 aws ec2 delete-security-group --group-id "${FRONTEND_SG}"
+```
 
-echo "Lab 4.1 clean-up completed successfully."
+4. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 4.1 clean-up completed successfully."
 ```
 
 ---

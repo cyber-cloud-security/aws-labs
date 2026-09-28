@@ -76,6 +76,8 @@ flowchart LR
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch EC2 Instance
+
+1. Query default VPC, subnet, Availability Zone, and AMI:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -94,22 +96,33 @@ export AZ=$(aws ec2 describe-subnets \
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
+2. Launch the EC2 instance:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
   --subnet-id "${SUBNET_ID}" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=ebs-lab-node}]" \
   --query "Instances[0].InstanceId" --output text)
-
-echo "Waiting for instance ${INSTANCE_ID} to run in ${AZ}..."
-aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
 
+3. Confirm launched instance and wait until running:
+```bash
+echo "Waiting for instance ${INSTANCE_ID} to run in ${AZ}..."
+aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
+echo "[SUCCESS] Instance is running in ${AZ}."
+```
+
+---
+
 ### Step 2: Create a 5 GiB gp3 Volume in the SAME Availability Zone
+
 > [!IMPORTANT]
 > EBS volumes are zonal resources! The volume MUST be created in the exact same Availability Zone (`${AZ}`) as the EC2 instance.
 
+1. Create the gp3 volume:
 ```bash
 VOLUME_ID=$(aws ec2 create-volume \
   --availability-zone "${AZ}" \
@@ -117,27 +130,40 @@ VOLUME_ID=$(aws ec2 create-volume \
   --volume-type "gp3" \
   --tag-specifications "ResourceType=volume,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=data-vol-1}]" \
   --query "VolumeId" --output text)
-
-echo "Created EBS Volume: ${VOLUME_ID}"
-aws ec2 wait volume-available --volume-ids "${VOLUME_ID}"
 ```
 
+2. Wait for the volume to become available:
+```bash
+echo "Created EBS Volume: ${VOLUME_ID}"
+aws ec2 wait volume-available --volume-ids "${VOLUME_ID}"
+echo "[SUCCESS] Volume ${VOLUME_ID} is available."
+```
+
+---
+
 ### Step 3: Attach Volume to the EC2 Instance
+
+1. Attach the volume to the instance:
 ```bash
 aws ec2 attach-volume \
   --volume-id "${VOLUME_ID}" \
   --instance-id "${INSTANCE_ID}" \
   --device "/dev/sdf"
-
-aws ec2 wait volume-in-use --volume-ids "${VOLUME_ID}"
-echo "Volume attached successfully."
 ```
 
+2. Wait for attachment to complete:
+```bash
+aws ec2 wait volume-in-use --volume-ids "${VOLUME_ID}"
+echo "[SUCCESS] Volume attached successfully."
+```
+
+---
+
 ### Step 4: Format, Mount & Configure `/etc/fstab`
-Send commands to the instance using AWS Systems Manager Run Command (or via SSH if you have keys configured):
+
+Send formatting and persistent mounting commands to the instance using AWS Systems Manager Run Command (or execute via SSH):
 
 ```bash
-# Execute partitioning, formatting, and persistent mount
 COMMAND_ID=$(aws ssm send-command \
   --instance-ids "${INSTANCE_ID}" \
   --document-name "AWS-RunShellScript" \
@@ -170,11 +196,15 @@ Now, simulate high disk usage requiring an emergency storage expansion from **5 
 aws ec2 modify-volume \
   --volume-id "${VOLUME_ID}" \
   --size 10
+```
 
+Confirm modification request:
+```bash
 echo "Requested volume expansion to 10 GiB..."
 ```
 
-Monitor modification state:
+### 2. Monitor Modification State
+Check the progress of volume expansion:
 ```bash
 aws ec2 describe-volumes-modifications \
   --volume-ids "${VOLUME_ID}" \
@@ -182,8 +212,8 @@ aws ec2 describe-volumes-modifications \
 ```
 The state will transition: `modifying` -> `optimizing` -> `completed`. The new capacity is visible to the hypervisor immediately in `optimizing` state!
 
-### 2. Extend Filesystem in OS (Zero Downtime)
-On the instance, the operating system kernel needs to extend the filesystem to take advantage of the newly available block capacity:
+### 3. Extend Filesystem in OS (Zero Downtime)
+On the instance, extend the filesystem to consume the newly available block capacity:
 
 For **XFS** filesystems:
 ```bash
@@ -196,11 +226,9 @@ For **ext4** filesystems:
 # resize2fs /dev/nvme1n1
 ```
 
-Verify the new size:
+Verify the expanded filesystem size:
 ```bash
 # df -h /mnt/data
-# Filesystem      Size  Used Avail Use% Mounted on
-# /dev/nvme1n1     10G   32M   10G   1% /mnt/data
 ```
 The storage is doubled without any unmounting or downtime.
 
@@ -208,20 +236,24 @@ The storage is doubled without any unmounting or downtime.
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Terminate the EC2 instance and wait for termination:
 ```bash
-# 1. Terminate EC2 instance
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
+```
 
-# 2. Wait for volume to become available and delete it
+2. Wait for the EBS volume to become available and delete it:
+```bash
 aws ec2 wait volume-available --volume-ids "${VOLUME_ID}" 2>/dev/null || true
 aws ec2 delete-volume --volume-id "${VOLUME_ID}"
+```
 
-echo "Lab 2.1 clean-up completed successfully."
+3. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 2.1 clean-up completed successfully."
 ```
 
 ---

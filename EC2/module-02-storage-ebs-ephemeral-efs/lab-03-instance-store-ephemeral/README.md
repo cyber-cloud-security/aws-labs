@@ -79,6 +79,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch an Instance with Local NVMe Storage
+
+1. Discover network identifiers and AMI:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -93,32 +95,51 @@ export SUBNET_ID=$(aws ec2 describe-subnets \
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
+2. Launch the `c5d.large` instance:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "c5d.large" \
   --subnet-id "${SUBNET_ID}" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=instance-store-benchmark}]" \
   --query "Instances[0].InstanceId" --output text)
-
-echo "Launched c5d.large node: ${INSTANCE_ID}"
-aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
 
-### Step 2: Identify and Mount the Ephemeral Device
-Connect via SSM Session Manager or SSH and inspect devices:
+3. Confirm launched instance and wait until running:
 ```bash
-# Check block devices:
+echo "Launched c5d.large node: ${INSTANCE_ID}"
+aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
+echo "[SUCCESS] Instance ${INSTANCE_ID} is running."
+```
+
+---
+
+### Step 2: Identify and Mount the Ephemeral Device
+
+Connect via SSM Session Manager or SSH and inspect devices:
+
+1. Check attached block devices:
+```bash
 lsblk
 ```
 Notice two disks:
 - `nvme0n1` (EBS root volume)
 - `nvme1n1` (50 GB Instance Store disk)
 
-Format and mount the ephemeral disk:
+2. Format the ephemeral disk with ext4:
 ```bash
 mkfs.ext4 -E nodiscard /dev/nvme1n1
+```
+
+3. Create the mount directory:
+```bash
 mkdir -p /mnt/ephemeral
+```
+
+4. Mount the ephemeral disk:
+```bash
 mount -o noatime /dev/nvme1n1 /mnt/ephemeral
 ```
 
@@ -127,12 +148,13 @@ mount -o noatime /dev/nvme1n1 /mnt/ephemeral
 ## 🔍 Verification & Testing
 
 ### 1. Benchmark IOPS & Latency (Instance Store vs EBS)
-Install `fio`:
+
+1. Install the `fio` benchmark utility:
 ```bash
 dnf install -y fio
 ```
 
-Run a 4K Random Write Benchmark on the Instance Store:
+2. Run a 4K Random Write Benchmark on the Instance Store:
 ```bash
 fio --name=randwrite-ephemeral \
     --ioengine=libaio \
@@ -148,7 +170,7 @@ fio --name=randwrite-ephemeral \
 ```
 **Observation**: High IOPS (>30,000–60,000 IOPS) with sub-100-microsecond latency.
 
-Run the same benchmark on the EBS root volume:
+3. Run the same benchmark on the EBS root volume:
 ```bash
 fio --name=randwrite-ebs \
     --ioengine=libaio \
@@ -164,46 +186,62 @@ fio --name=randwrite-ebs \
 ```
 **Observation**: EBS baseline throughput is constrained by the 3,000 IOPS / 125 MB/s gp3 limit.
 
+---
+
 ### 2. Test Data Volatility Across Reboot vs Stop/Start
-Write a canary file to the ephemeral drive:
+
+1. Write a canary file to the ephemeral drive:
 ```bash
 echo "Canary payload: instance-store-survives-reboot" > /mnt/ephemeral/canary.txt
 ```
 
-**Test A: Reboot Instance**
+#### Test A: Warm OS Reboot
+1. Reboot the instance:
 ```bash
 sudo reboot
 ```
-Reconnect after 1 minute:
+
+2. Reconnect after 1 minute and verify the canary file:
 ```bash
 cat /mnt/ephemeral/canary.txt
 ```
 *Result: The file still exists! Data persists across warm OS reboots.*
 
-**Test B: Stop and Start Instance**
-From your local CLI:
+#### Test B: Stop and Start Instance (Hardware Migration)
+1. Stop the instance from your local CLI:
 ```bash
 aws ec2 stop-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-stopped --instance-ids "${INSTANCE_ID}"
+```
 
+2. Start the instance back up:
+```bash
 aws ec2 start-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
-Reconnect to the instance and inspect `lsblk`:
-*Result: The instance store device is completely blank. The filesystem and `/mnt/ephemeral/canary.txt` have been purged! The instance has booted on a new physical server.*
+
+3. Reconnect to the instance and inspect block devices:
+```bash
+lsblk
+```
+*Result: The instance store device is completely blank. The filesystem and `/mnt/ephemeral/canary.txt` have been purged because the instance booted on a new physical hypervisor.*
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Terminate the instance and wait for termination:
 ```bash
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
-echo "Lab 2.3 clean-up completed successfully."
+```
+
+2. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 2.3 clean-up completed successfully."
 ```
 
 ---

@@ -2,9 +2,12 @@
 
 # 💾 Module 02: Storage Architecture (EBS, Ephemeral & EFS)
 
-**[🏠 AWS Labs Root](../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Master Curriculum](../README.md)**
+**[🏠 AWS Labs Root](../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Master Curriculum](../README.md)** &nbsp;•&nbsp; **[⚙️ Module 00 Prerequisites](../module-00-prerequisites/README.md)**
 
-![🧪 Labs](https://img.shields.io/badge/%F0%9F%A7%AA_Labs-4_Hands--On_Labs-0969da?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate-8250df?style=flat-square) ![⚙️ Focus](https://img.shields.io/badge/%E2%9A%99%EF%B8%8F_Focus-EBS_%7C_NVMe_%7C_EFS_%7C_DLM-FF9900?style=flat-square)
+![🧪 Labs](https://img.shields.io/badge/🧪_Labs-4_Hands--On_Labs-539bf5?style=flat-square)
+![🎯 Level](https://img.shields.io/badge/🎯_Level-Intermediate-8250df?style=flat-square)
+![⚙️ Focus](https://img.shields.io/badge/⚙️_Focus-EBS_%7C_NVMe_%7C_EFS_%7C_DLM-f69d50?style=flat-square)
+![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Module 01](../module-01-fundamentals-and-lifecycle/README.md)** &nbsp;|&nbsp; **[➡️ Module 03](../module-03-networking-eni-placement/README.md)**
 

@@ -85,6 +85,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create an EFS Security Group
+
+1. Discover default VPC and create the security group:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -98,22 +100,32 @@ EFS_SG_ID=$(aws ec2 create-security-group \
   --vpc-id "${VPC_ID}" \
   --tag-specifications "ResourceType=security-group,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=efs-sg}]" \
   --query "GroupId" --output text)
+```
 
-# Allow NFS Port 2049 from within the VPC CIDR
+2. Authorize NFS port 2049 inbound from within the VPC CIDR:
+```bash
 VPC_CIDR=$(aws ec2 describe-vpcs \
   --vpc-ids "${VPC_ID}" \
   --query "Vpcs[0].CidrBlock" \
   --output text)
+
 aws ec2 authorize-security-group-ingress \
   --group-id "${EFS_SG_ID}" \
   --protocol tcp \
   --port 2049 \
   --cidr "${VPC_CIDR}"
+```
 
+3. Confirm created security group:
+```bash
 echo "EFS Security Group Created: ${EFS_SG_ID}"
 ```
 
+---
+
 ### Step 2: Create the EFS File System
+
+1. Provision the encrypted EFS filesystem:
 ```bash
 EFS_ID=$(aws efs create-file-system \
   --performance-mode "generalPurpose" \
@@ -121,14 +133,18 @@ EFS_ID=$(aws efs create-file-system \
   --encrypted \
   --tags "Key=Project,Value=ec2-master-labs" "Key=Name,Value=shared-efs-lab" \
   --query "FileSystemId" --output text)
-
-echo "Created EFS File System: ${EFS_ID}"
-# Wait for EFS to become available
-sleep 5
 ```
 
+2. Confirm created EFS File System:
+```bash
+echo "Created EFS File System: ${EFS_ID}"
+```
+
+---
+
 ### Step 3: Create Mount Targets in Two Availability Zones
-Retrieve subnets in two different AZs:
+
+1. Retrieve subnets in two different Availability Zones:
 ```bash
 SUBNET_1=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
@@ -138,36 +154,54 @@ SUBNET_2=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
   --query "Subnets[1].SubnetId" \
   --output text)
+```
 
-# Mount Target in Subnet 1
+2. Create Mount Target in Subnet 1:
+```bash
 MT1_ID=$(aws efs create-mount-target \
   --file-system-id "${EFS_ID}" \
   --subnet-id "${SUBNET_1}" \
   --security-groups "${EFS_SG_ID}" \
   --query "MountTargetId" --output text)
+```
 
-# Mount Target in Subnet 2
+3. Create Mount Target in Subnet 2:
+```bash
 MT2_ID=$(aws efs create-mount-target \
   --file-system-id "${EFS_ID}" \
   --subnet-id "${SUBNET_2}" \
   --security-groups "${EFS_SG_ID}" \
   --query "MountTargetId" --output text)
+```
 
+4. Confirm created mount targets:
+```bash
 echo "Created Mount Targets: ${MT1_ID}, ${MT2_ID}"
 ```
 
+---
+
 ### Step 4: Mount EFS on EC2 Instances using `amazon-efs-utils`
-Install the EFS client and mount the filesystem:
+
+Execute the following on your Amazon Linux 2023 instance:
+
+1. Install the `amazon-efs-utils` package:
 ```bash
-# On your Amazon Linux 2023 instance:
 sudo dnf install -y amazon-efs-utils
+```
 
+2. Create the mount directory:
+```bash
 sudo mkdir -p /mnt/efs
+```
 
-# Mount with in-transit TLS encryption:
+3. Mount EFS with in-transit TLS encryption:
+```bash
 sudo mount -t efs -o tls ${EFS_ID}:/ /mnt/efs
+```
 
-# Add to /etc/fstab for auto-mount on reboot:
+4. Add entry to `/etc/fstab` for auto-mounting on reboot:
+```bash
 echo "${EFS_ID}:/ /mnt/efs efs _netdev,tls 0 0" | sudo tee -a /etc/fstab
 ```
 
@@ -195,21 +229,26 @@ The file written by Instance A is instantly readable by Instance B across differ
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Delete Mount Targets:
 ```bash
-# 1. Delete Mount Targets
 aws efs delete-mount-target --mount-target-id "${MT1_ID}"
 aws efs delete-mount-target --mount-target-id "${MT2_ID}"
+```
 
-# Wait for mount targets to terminate
+2. Wait for mount targets to terminate and delete the EFS file system:
+```bash
 sleep 15
-
-# 2. Delete EFS File System
 aws efs delete-file-system --file-system-id "${EFS_ID}"
+```
 
-# 3. Delete Security Group
+3. Delete the EFS Security Group:
+```bash
 aws ec2 delete-security-group --group-id "${EFS_SG_ID}"
+```
 
-echo "Lab 2.4 clean-up completed successfully."
+4. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 2.4 clean-up completed successfully."
 ```
 
 ---

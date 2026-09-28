@@ -84,28 +84,34 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create a Snapshot of an Existing Volume
-Assume an active EBS volume `VOLUME_ID`:
+
+1. Discover region and initiate point-in-time snapshot:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 
-# Create snapshot with descriptive tags
 SNAPSHOT_ID=$(aws ec2 create-snapshot \
   --volume-id "${VOLUME_ID}" \
   --description "Manual point-in-time backup for Lab 2.2" \
   --tag-specifications "ResourceType=snapshot,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=manual-backup-1}]" \
   --query "SnapshotId" --output text)
-
-echo "Snapshot creation initiated: ${SNAPSHOT_ID}"
-aws ec2 wait snapshot-completed --snapshot-ids "${SNAPSHOT_ID}"
-echo "Snapshot completed."
 ```
 
+2. Wait for snapshot creation to complete:
+```bash
+echo "Snapshot creation initiated: ${SNAPSHOT_ID}"
+aws ec2 wait snapshot-completed --snapshot-ids "${SNAPSHOT_ID}"
+echo "[SUCCESS] Snapshot ${SNAPSHOT_ID} completed."
+```
+
+---
+
 ### Step 2: Configure Amazon Data Lifecycle Manager (DLM) Policy
+
 DLM automatically snapshots volumes based on tag selectors:
 
-1. Create IAM Role for DLM:
+1. Create the IAM trust policy document:
 ```bash
-cat <<JSON > dlm-trust-policy.json
+cat << 'EOF' > dlm-trust-policy.json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -116,8 +122,11 @@ cat <<JSON > dlm-trust-policy.json
     }
   ]
 }
-JSON
+EOF
+```
 
+2. Create the IAM Role for DLM:
+```bash
 DLM_ROLE_ARN=$(aws iam create-role \
   --role-name "ec2-labs-dlm-lifecycle-role" \
   --assume-role-policy-document file://dlm-trust-policy.json \
@@ -126,15 +135,18 @@ DLM_ROLE_ARN=$(aws iam create-role \
     --role-name "ec2-labs-dlm-lifecycle-role" \
     --query "Role.Arn" \
     --output text)
+```
 
+3. Attach the managed DLM service role policy:
+```bash
 aws iam attach-role-policy \
   --role-name "ec2-labs-dlm-lifecycle-role" \
   --policy-arn "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
 ```
 
-2. Create Lifecycle Policy JSON:
+4. Create the Lifecycle Policy JSON configuration:
 ```bash
-cat <<JSON > dlm-policy.json
+cat << 'EOF' > dlm-policy.json
 {
   "ResourceTypes": ["VOLUME"],
   "TargetTags": [
@@ -155,20 +167,29 @@ cat <<JSON > dlm-policy.json
     }
   ]
 }
-JSON
+EOF
+```
 
+5. Create the DLM Lifecycle Policy:
+```bash
 POLICY_ID=$(aws dlm create-lifecycle-policy \
   --description "Daily 7-day retention EBS snapshot policy" \
   --state ENABLED \
   --execution-role-arn "${DLM_ROLE_ARN}" \
   --policy-details file://dlm-policy.json \
   --query "PolicyId" --output text)
+```
 
+6. Confirm created DLM Policy ID:
+```bash
 echo "Created DLM Policy ID: ${POLICY_ID}"
 ```
 
+---
+
 ### Step 3: Provision an `io2` Multi-Attach Volume
-Create an `io2` volume configured with Multi-Attach:
+
+1. Create an `io2` volume configured with Multi-Attach:
 ```bash
 AZ="us-east-1a"
 
@@ -180,9 +201,13 @@ IO2_VOL_ID=$(aws ec2 create-volume \
   --multi-attach-enabled \
   --tag-specifications "ResourceType=volume,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=multi-attach-io2}]" \
   --query "VolumeId" --output text)
+```
 
+2. Wait for the io2 volume to become available:
+```bash
 echo "Created Multi-Attach io2 Volume: ${IO2_VOL_ID}"
 aws ec2 wait volume-available --volume-ids "${IO2_VOL_ID}"
+echo "[SUCCESS] Multi-Attach io2 Volume is available."
 ```
 
 ---
@@ -190,20 +215,25 @@ aws ec2 wait volume-available --volume-ids "${IO2_VOL_ID}"
 ## 🔍 Verification: Multi-Attach to Two Running Instances
 
 Verify that the volume can be attached to two separate instances simultaneously:
+
+1. Attach the volume to Instance A:
 ```bash
-# Attach to Instance A
 aws ec2 attach-volume \
   --volume-id "${IO2_VOL_ID}" \
   --instance-id "${INSTANCE_A_ID}" \
   --device "/dev/sdf"
+```
 
-# Attach to Instance B (Normal EBS volumes would throw InvalidParameterCombination / VolumeInUse)
+2. Attach the same volume concurrently to Instance B:
+```bash
 aws ec2 attach-volume \
   --volume-id "${IO2_VOL_ID}" \
   --instance-id "${INSTANCE_B_ID}" \
   --device "/dev/sdf"
+```
 
-# Check attachments:
+3. Verify both active attachments:
+```bash
 aws ec2 describe-volumes \
   --volume-ids "${IO2_VOL_ID}" \
   --query "Volumes[0].Attachments[*].[InstanceId,State,Device]" \
@@ -215,31 +245,43 @@ Both instances will show state: `attached`.
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Delete the DLM Policy:
 ```bash
-# 1. Delete DLM Policy
 aws dlm delete-lifecycle-policy --policy-id "${POLICY_ID}"
+```
 
-# 2. Detach and delete io2 volume
+2. Detach and delete the `io2` volume:
+```bash
 aws ec2 detach-volume --volume-id "${IO2_VOL_ID}" --instance-id "${INSTANCE_A_ID}" 2>/dev/null || true
 aws ec2 detach-volume --volume-id "${IO2_VOL_ID}" --instance-id "${INSTANCE_B_ID}" 2>/dev/null || true
 sleep 10
 aws ec2 delete-volume --volume-id "${IO2_VOL_ID}"
+```
 
-# 3. Delete manual snapshot
+3. Delete the manual snapshot:
+```bash
 aws ec2 delete-snapshot --snapshot-id "${SNAPSHOT_ID}"
+```
 
-# 4. Cleanup DLM IAM role
+4. Detach role policy and delete DLM IAM role:
+```bash
 aws iam detach-role-policy \
   --role-name "ec2-labs-dlm-lifecycle-role" \
   --policy-arn "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
 aws iam delete-role --role-name "ec2-labs-dlm-lifecycle-role"
-rm -f dlm-trust-policy.json dlm-policy.json
+```
 
-echo "Lab 2.2 clean-up completed successfully."
+5. Clean up local temporary policy files:
+```bash
+rm -f dlm-trust-policy.json dlm-policy.json
+```
+
+6. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 2.2 clean-up completed successfully."
 ```
 
 ---

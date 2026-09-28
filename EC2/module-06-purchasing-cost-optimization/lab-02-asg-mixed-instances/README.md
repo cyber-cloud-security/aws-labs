@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 06](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-06_%E2%80%94_Purchasing_Models_%26_FinOps_Cost_Optimization-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-06_%E2%80%94_Purchasing_Models_%26_FinOps_Cost_Optimization-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-06-purchasing-cost-optimization/lab-01-spot-interruption-handling/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-06-purchasing-cost-optimization/lab-03-cost-optimization-rightsizing/README.md)**
 
@@ -79,6 +79,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create the Base Launch Template
+
+1. Query network and AMI parameters:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -97,14 +99,21 @@ SUBNET_2=$(aws ec2 describe-subnets \
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
-cat <<JSON > mixed-lt.json
+2. Create template definition:
+```bash
+cat << 'JSON' > mixed-lt.json
 {
   "ImageId": "${AMI_ID}",
   "MetadataOptions": { "HttpTokens": "required" }
 }
 JSON
+sed -i.bak "s|\${AMI_ID}|${AMI_ID}|g" mixed-lt.json && rm -f mixed-lt.json.bak
+```
 
+3. Create Launch Template:
+```bash
 LT_ID=$(aws ec2 create-launch-template \
   --launch-template-name "lt-mixed-demo" \
   --launch-template-data file://mixed-lt.json \
@@ -112,13 +121,15 @@ LT_ID=$(aws ec2 create-launch-template \
 ```
 
 ### Step 2: Define Mixed Instances Policy JSON
+
+1. Create mixed instances policy configuration:
 ```bash
-cat <<JSON > mixed-policy.json
+cat << 'JSON' > mixed-policy.json
 {
   "LaunchTemplate": {
     "LaunchTemplateSpecification": {
       "LaunchTemplateId": "${LT_ID}",
-      "Version": "\$Latest"
+      "Version": "$Latest"
     },
     "Overrides": [
       { "InstanceType": "t3.micro" },
@@ -134,9 +145,12 @@ cat <<JSON > mixed-policy.json
   }
 }
 JSON
+sed -i.bak "s|\${LT_ID}|${LT_ID}|g" mixed-policy.json && rm -f mixed-policy.json.bak
 ```
 
 ### Step 3: Deploy ASG with Mixed Instances Policy
+
+1. Create ASG using the mixed instances policy:
 ```bash
 aws autoscaling create-auto-scaling-group \
   --auto-scaling-group-name "asg-mixed-fleet-demo" \
@@ -145,9 +159,11 @@ aws autoscaling create-auto-scaling-group \
   --max-size 5 \
   --desired-capacity 3 \
   --vpc-zone-identifier "${SUBNET_1},${SUBNET_2}"
+```
 
-echo "Created ASG with Mixed Instances Policy."
-echo "Waiting for instances to launch..."
+2. Allow instances to launch:
+```bash
+echo "[INFO] Waiting 25 seconds for instances to launch..."
 sleep 25
 ```
 
@@ -155,53 +171,51 @@ sleep 25
 
 ## 🔍 Verification & Lifecycle Breakdown
 
-Inspect the fleet distribution:
+1. Inspect the fleet distribution across lifecycle models:
 ```bash
 aws ec2 describe-instances \
   --filters "Name=tag:aws:autoscaling:groupName,Values=asg-mixed-fleet-demo" \
   --query "Reservations[*].Instances[*].[InstanceId,InstanceType,InstanceLifecycle||'on-demand',Placement.AvailabilityZone]" \
   --output table
 ```
-**Sample Output**:
-```text
-----------------------------------------------------------------------
-|                          DescribeInstances                         |
-+----------------------+------------+------------+-------------------+
-|  i-0123456789abcdef0 |  t3.micro  |  on-demand |  us-east-1a       |
-|  i-0987654321fedcba1 |  t3a.micro |  spot      |  us-east-1b       |
-|  i-0abcdef1234567890 |  t3.micro  |  spot      |  us-east-1a       |
-+----------------------+------------+------------+-------------------+
-```
-Notice:
-- Instance 1 is **On-Demand** (fulfilling the `OnDemandBaseCapacity=1` guarantee).
-- Instances 2 and 3 are **Spot** (running at ~70–90% cost savings).
-- Instances are diversified across multiple instance types and AZs.
+
+**Key Architectural Observations**:
+- Instance 1 is **On-Demand** (fulfilling the `OnDemandBaseCapacity=1` baseline guarantee).
+- Remaining instances are **Spot** (running at ~70–90% cost savings).
+- Instances are diversified across multiple instance types and Availability Zones.
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Scale down ASG capacity:
 ```bash
-# 1. Terminate fleet
 aws autoscaling update-auto-scaling-group \
   --auto-scaling-group-name "asg-mixed-fleet-demo" \
   --min-size 0 \
   --desired-capacity 0
-
 sleep 15
+```
+
+2. Force delete ASG:
+```bash
 aws autoscaling delete-auto-scaling-group \
   --auto-scaling-group-name "asg-mixed-fleet-demo" \
   --force-delete
+```
 
-# 2. Delete Launch Template
+3. Delete Launch Template and config files:
+```bash
 aws ec2 delete-launch-template --launch-template-id "${LT_ID}"
 rm -f mixed-lt.json mixed-policy.json
+```
 
-echo "Lab 6.2 clean-up completed successfully."
+4. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 6.2 clean-up completed successfully."
 ```
 
 ---

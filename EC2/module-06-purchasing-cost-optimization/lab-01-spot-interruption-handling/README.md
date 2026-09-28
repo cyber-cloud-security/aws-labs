@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 06](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Paid_%28~%240.05_--_%240.15%29-d29922?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-06_%E2%80%94_Purchasing_Models_%26_FinOps_Cost_Optimization-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Paid_%28~%240.05_--_%240.15%29-d29922?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-06_%E2%80%94_Purchasing_Models_%26_FinOps_Cost_Optimization-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-05-ha-asg-alb/lab-04-asg-lifecycle-hooks/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-06-purchasing-cost-optimization/lab-02-asg-mixed-instances/README.md)**
 
@@ -78,6 +78,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch a Spot Instance via AWS CLI
+
+1. Query network parameters:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -88,11 +90,17 @@ export SUBNET_ID=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
   --query "Subnets[0].SubnetId" \
   --output text)
+```
 
+2. Retrieve Amazon Linux 2023 AMI:
+```bash
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
+3. Launch Spot instance with `instance-market-options`:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
@@ -101,57 +109,60 @@ INSTANCE_ID=$(aws ec2 run-instances \
   --metadata-options "HttpEndpoint=enabled,HttpTokens=required" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=spot-worker}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
-echo "Launched Spot Instance: ${INSTANCE_ID}"
+4. Wait for the Spot instance to reach running state:
+```bash
 aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
 
 ### Step 2: Verify Market Option is Spot
+
+1. Verify the instance lifecycle is reported as `spot`:
 ```bash
 aws ec2 describe-instances \
   --instance-ids "${INSTANCE_ID}" \
   --query "Reservations[0].Instances[0].[InstanceLifecycle,SpotInstanceRequestId]" \
   --output table
 ```
-`InstanceLifecycle` will show `spot`.
 
 ---
 
 ## 🔍 The Spot Watchdog Daemon (Guest OS)
 
-Inside the instance, deploy a lightweight Python or bash watchdog script that constantly polls IMDSv2:
+Inside the instance, deploy a lightweight watchdog script that constantly polls IMDSv2:
 
+1. Create watchdog script:
 ```bash
-cat <<'SCRIPT' > /usr/local/bin/spot_watchdog.sh
+cat << 'SCRIPT' > /usr/local/bin/spot_watchdog.sh
 #!/bin/bash
-echo "[*] Starting Spot Interruption Watchdog Daemon..."
+echo "[INFO] Starting Spot Interruption Watchdog Daemon..."
 
 while true; do
-  # 1. Fetch IMDSv2 Token
   TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
     -H "X-aws-ec2-metadata-token-ttl-seconds: 60" 2>/dev/null)
 
-  # 2. Query spot instance action
   HTTP_STATUS=$(curl -s -o /tmp/spot_action.json -w "%{http_code}" \
     -H "X-aws-ec2-metadata-token: $TOKEN" \
     http://169.254.169.254/latest/meta-data/spot/instance-action)
 
   if [ "$HTTP_STATUS" -eq 200 ]; then
-    echo "[!] CRITICAL: Spot Interruption Notice received at $(date)!"
+    echo "[WARNING] Spot Interruption Notice received at $(date)!"
     cat /tmp/spot_action.json
     
-    # 3. Trigger graceful application drain:
-    echo "[*] Flushing local buffers to remote storage..."
+    echo "[INFO] Flushing local buffers to remote storage..."
     sync
-    echo "[*] Application safely prepared for termination."
+    echo "[SUCCESS] Application safely prepared for termination."
     exit 0
   fi
 
-  # Poll interval: 5 seconds
   sleep 5
 done
 SCRIPT
+```
 
+2. Make watchdog executable:
+```bash
 chmod +x /usr/local/bin/spot_watchdog.sh
 ```
 
@@ -159,14 +170,18 @@ chmod +x /usr/local/bin/spot_watchdog.sh
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Terminate the Spot instance:
 ```bash
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
-echo "Lab 6.1 clean-up completed successfully."
+```
+
+2. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 6.1 clean-up completed successfully."
 ```
 
 ---

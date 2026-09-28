@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 06](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-06_%E2%80%94_Purchasing_Models_%26_FinOps_Cost_Optimization-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-06_%E2%80%94_Purchasing_Models_%26_FinOps_Cost_Optimization-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-06-purchasing-cost-optimization/lab-02-asg-mixed-instances/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-07-monitoring-and-troubleshooting/lab-01-status-checks-autorecovery/README.md)**
 
@@ -82,34 +82,46 @@ flowchart LR
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create a Legacy `gp2` Volume
+
+1. Discover primary Availability Zone:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 AZ=$(aws ec2 describe-availability-zones \
   --query "AvailabilityZones[0].ZoneName" \
   --output text)
+```
 
+2. Create a 20 GB `gp2` EBS volume:
+```bash
 LEGACY_VOL_ID=$(aws ec2 create-volume \
   --availability-zone "${AZ}" \
   --size 20 \
   --volume-type "gp2" \
   --tag-specifications "ResourceType=volume,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=legacy-gp2-volume}]" \
   --query "VolumeId" --output text)
+```
 
-echo "Created Legacy gp2 Volume: ${LEGACY_VOL_ID}"
+3. Wait for volume to become available:
+```bash
+echo "[SUCCESS] Created Legacy gp2 Volume: ${LEGACY_VOL_ID}"
 aws ec2 wait volume-available --volume-ids "${LEGACY_VOL_ID}"
 ```
 
 ### Step 2: Perform Zero-Downtime Migration to `gp3`
-Convert the volume type live using Elastic Volumes:
+
+1. Convert the volume type live using Elastic Volumes:
 ```bash
 aws ec2 modify-volume \
   --volume-id "${LEGACY_VOL_ID}" \
   --volume-type "gp3"
-
-echo "Sent modification command: Converting gp2 -> gp3..."
 ```
 
-Verify the transformation:
+2. Confirm modification submission:
+```bash
+echo "[INFO] Sent modification command: Converting gp2 -> gp3..."
+```
+
+3. Verify updated volume specifications:
 ```bash
 aws ec2 describe-volumes \
   --volume-ids "${LEGACY_VOL_ID}" \
@@ -122,12 +134,13 @@ aws ec2 describe-volumes \
 
 ## 🔍 AWS Compute Optimizer Inspection
 
-Query Compute Optimizer recommendations (must be enrolled in your AWS account):
+1. Query Compute Optimizer recommendations (must be enrolled in your AWS account):
 ```bash
 aws compute-optimizer get-ec2-instance-recommendations \
   --query "instanceRecommendations[*].[instanceArn,currentInstanceType,finding,recommendationOptions[0].instanceType]" \
-  --output table 2>/dev/null || echo "Compute Optimizer requires opt-in via AWS Console."
+  --output table 2>/dev/null || echo "[INFO] Compute Optimizer requires opt-in via AWS Console."
 ```
+
 Findings categorize instances as:
 - `Underprovisioned`: Bottlenecked on CPU/RAM.
 - `Overprovisioned`: Wasting money on excess resources.
@@ -137,13 +150,17 @@ Findings categorize instances as:
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Delete test EBS volume:
 ```bash
 aws ec2 delete-volume --volume-id "${LEGACY_VOL_ID}"
-echo "Lab 6.3 clean-up completed successfully."
+```
+
+2. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 6.3 clean-up completed successfully."
 ```
 
 ---

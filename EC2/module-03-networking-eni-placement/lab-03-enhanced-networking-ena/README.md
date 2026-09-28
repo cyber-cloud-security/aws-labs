@@ -83,7 +83,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch an Instance and Verify ENA Support
-Launch an instance with enhanced networking enabled by default:
+
+1. Discover default network identifiers and AMI:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -98,18 +99,29 @@ export SUBNET_ID=$(aws ec2 describe-subnets \
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
+2. Launch the EC2 instance with enhanced networking enabled by default:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
   --subnet-id "${SUBNET_ID}" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=ena-network-node}]" \
   --query "Instances[0].InstanceId" --output text)
-
-aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
 
+3. Wait for the instance to enter running state:
+```bash
+echo "Waiting for instance ${INSTANCE_ID} to enter running state..."
+aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
+echo "[SUCCESS] Instance ${INSTANCE_ID} is running."
+```
+
+---
+
 ### Step 2: Query ENA Attribute via AWS CLI
+
 Verify that `EnaSupport` is enabled on the instance:
 ```bash
 aws ec2 describe-instances \
@@ -142,12 +154,12 @@ Key metrics to watch in production:
 - `conntrack_allowance_exceeded`: Exceeded maximum active tracked connections in the Nitro security group engine.
 
 ### 3. Configure Jumbo Frames (MTU 9001)
-Check current MTU:
+1. Check the current MTU on the interface:
 ```bash
 ip link show eth0 | grep mtu
-# <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9001 qdisc mq state UP ...
 ```
-If MTU is 1500, set it to 9001:
+
+2. If MTU is 1500, configure Jumbo Frames (MTU 9001):
 ```bash
 sudo ip link set dev eth0 mtu 9001
 ```
@@ -165,14 +177,18 @@ On instances supporting ENA Express (such as `c6i.large`), enable it at the netw
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Terminate the instance and wait for termination:
 ```bash
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
-echo "Lab 3.3 clean-up completed successfully."
+```
+
+2. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 3.3 clean-up completed successfully."
 ```
 
 ---

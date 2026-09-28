@@ -110,33 +110,45 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create Placement Groups for Each Strategy
+
+1. Create a Cluster Placement Group:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 
-# 1. Cluster Placement Group
 aws ec2 create-placement-group \
   --group-name "pg-hpc-cluster" \
   --strategy "cluster" \
   --tag-specifications "ResourceType=placement-group,Tags=[{Key=Project,Value=ec2-master-labs}]"
+```
 
-# 2. Spread Placement Group
+2. Create a Spread Placement Group with rack-level isolation:
+```bash
 aws ec2 create-placement-group \
   --group-name "pg-ha-spread" \
   --strategy "spread" \
   --spread-level "rack" \
   --tag-specifications "ResourceType=placement-group,Tags=[{Key=Project,Value=ec2-master-labs}]"
+```
 
-# 3. Partition Placement Group (3 partitions)
+3. Create a Partition Placement Group (3 partitions):
+```bash
 aws ec2 create-placement-group \
   --group-name "pg-kafka-partition" \
   --strategy "partition" \
   --partition-count 3 \
   --tag-specifications "ResourceType=placement-group,Tags=[{Key=Project,Value=ec2-master-labs}]"
-
-echo "Created Cluster, Spread, and Partition placement groups."
 ```
 
+4. Confirm placement group creations:
+```bash
+echo "[SUCCESS] Created Cluster, Spread, and Partition placement groups."
+```
+
+---
+
 ### Step 2: Launch Instances into the Spread Placement Group
+
+1. Discover network parameters and AMI:
 ```bash
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
@@ -150,8 +162,10 @@ SUBNET_ID=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
   --query "Subnets[0].SubnetId" \
   --output text)
+```
 
-# Launch 2 instances guaranteed to sit on separate physical server racks
+2. Launch 2 instances guaranteed to sit on separate physical server racks:
+```bash
 INSTANCE_IDS=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
@@ -160,7 +174,10 @@ INSTANCE_IDS=$(aws ec2 run-instances \
   --placement "GroupName=pg-ha-spread" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=spread-node}]" \
   --query "Instances[*].InstanceId" --output text)
+```
 
+3. Confirm launched instance IDs:
+```bash
 echo "Launched instances in Spread Placement Group: ${INSTANCE_IDS}"
 ```
 
@@ -184,17 +201,22 @@ Both instances run in the same AZ under `pg-ha-spread`, but AWS guarantees they 
 > [!NOTE]
 > A placement group cannot be deleted until all instances inside it are terminated and reached the `terminated` state.
 
+1. Terminate instances and wait for termination:
 ```bash
-# 1. Terminate instances
 aws ec2 terminate-instances --instance-ids ${INSTANCE_IDS}
 aws ec2 wait instance-terminated --instance-ids ${INSTANCE_IDS}
+```
 
-# 2. Delete placement groups
+2. Delete the placement groups:
+```bash
 aws ec2 delete-placement-group --group-name "pg-hpc-cluster"
 aws ec2 delete-placement-group --group-name "pg-ha-spread"
 aws ec2 delete-placement-group --group-name "pg-kafka-partition"
+```
 
-echo "Lab 3.4 clean-up completed successfully."
+3. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 3.4 clean-up completed successfully."
 ```
 
 ---

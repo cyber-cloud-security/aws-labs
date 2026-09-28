@@ -75,6 +75,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch Primary (Active) and Standby (Passive) Instances
+
+1. Discover network parameters and AMI:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -89,8 +91,10 @@ export SUBNET_ID=$(aws ec2 describe-subnets \
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
-# Create Primary and Standby bootstrap scripts
+2. Create Primary and Standby bootstrap scripts:
+```bash
 cat << 'EOF' > primary_userdata.sh
 #!/bin/bash
 dnf install -y nginx
@@ -104,8 +108,10 @@ dnf install -y nginx
 echo '<h1>STANDBY Failover Node</h1>' > /usr/share/nginx/html/index.html
 systemctl start nginx
 EOF
+```
 
-# Launch Primary Node
+3. Launch Primary Node:
+```bash
 PRIMARY_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
@@ -113,8 +119,10 @@ PRIMARY_ID=$(aws ec2 run-instances \
   --user-data file://primary_userdata.sh \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=ha-primary}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
-# Launch Standby Node
+4. Launch Standby Node:
+```bash
 STANDBY_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
@@ -122,12 +130,20 @@ STANDBY_ID=$(aws ec2 run-instances \
   --user-data file://standby_userdata.sh \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=ha-standby}]" \
   --query "Instances[0].InstanceId" --output text)
-
-echo "Waiting for instances to enter running state..."
-aws ec2 wait instance-running --instance-ids "${PRIMARY_ID}" "${STANDBY_ID}"
 ```
 
+5. Confirm launched instances and wait until running:
+```bash
+echo "Waiting for instances to enter running state..."
+aws ec2 wait instance-running --instance-ids "${PRIMARY_ID}" "${STANDBY_ID}"
+echo "[SUCCESS] Primary and Standby nodes are running."
+```
+
+---
+
 ### Step 2: Allocate an Elastic IP Address
+
+1. Allocate an Elastic IP in the VPC domain:
 ```bash
 ALLOCATION_OUTPUT=$(aws ec2 allocate-address \
   --domain vpc \
@@ -136,17 +152,27 @@ ALLOCATION_OUTPUT=$(aws ec2 allocate-address \
 
 ALLOCATION_ID=$(echo "${ALLOCATION_OUTPUT}" | grep -o '"AllocationId": "[^"]*' | cut -d'"' -f4)
 PUBLIC_IP=$(echo "${ALLOCATION_OUTPUT}" | grep -o '"PublicIp": "[^"]*' | cut -d'"' -f4)
+```
 
+2. Confirm allocated Elastic IP:
+```bash
 echo "Allocated EIP: ${PUBLIC_IP} (Allocation ID: ${ALLOCATION_ID})"
 ```
 
+---
+
 ### Step 3: Associate EIP with Primary Instance
+
+1. Associate the Elastic IP with the Primary instance:
 ```bash
 ASSOC_ID=$(aws ec2 associate-address \
   --instance-id "${PRIMARY_ID}" \
   --allocation-id "${ALLOCATION_ID}" \
   --query "AssociationId" --output text)
+```
 
+2. Confirm association:
+```bash
 echo "Associated EIP with Primary Node. Association ID: ${ASSOC_ID}"
 ```
 
@@ -162,21 +188,24 @@ curl "http://${PUBLIC_IP}"
 **Output**: `<h1>PRIMARY Active Node</h1>`
 
 ### 2. Simulate Node Crash & Trigger EIP Failover
-Simulate failure by stopping the Primary instance:
+1. Simulate failure by stopping the Primary instance:
 ```bash
 echo "Simulating failure: Stopping primary node..."
 aws ec2 stop-instances --instance-ids "${PRIMARY_ID}"
 ```
 
-Perform automated failover by re-associating the Elastic IP to the Standby Node using `--allow-reassociation`:
+2. Perform automated failover by re-associating the Elastic IP to the Standby Node using `--allow-reassociation`:
 ```bash
 FAILOVER_ASSOC_ID=$(aws ec2 associate-address \
   --instance-id "${STANDBY_ID}" \
   --allocation-id "${ALLOCATION_ID}" \
   --allow-reassociation \
   --query "AssociationId" --output text)
+```
 
-echo "EIP re-associated to Standby Node! New Association ID: ${FAILOVER_ASSOC_ID}"
+3. Confirm re-association:
+```bash
+echo "[SUCCESS] EIP re-associated to Standby Node! New Association ID: ${FAILOVER_ASSOC_ID}"
 ```
 
 ### 3. Verify Traffic Now Reaches Standby
@@ -193,19 +222,31 @@ Traffic switched seamlessly to the healthy standby server with zero DNS propagat
 > [!CAUTION]
 > Always disassociate and **release** the Elastic IP, otherwise idle charges will accrue!
 
+1. Disassociate EIP:
 ```bash
-# 1. Disassociate EIP
 aws ec2 disassociate-address --association-id "${FAILOVER_ASSOC_ID}"
+```
 
-# 2. Release EIP back to the AWS pool
+2. Release EIP back to the AWS pool:
+```bash
 aws ec2 release-address --allocation-id "${ALLOCATION_ID}"
 echo "Released Elastic IP ${PUBLIC_IP}."
+```
 
-# 3. Terminate instances
+3. Terminate instances and wait for termination:
+```bash
 aws ec2 terminate-instances --instance-ids "${PRIMARY_ID}" "${STANDBY_ID}"
 aws ec2 wait instance-terminated --instance-ids "${PRIMARY_ID}" "${STANDBY_ID}"
+```
 
-echo "Lab 3.2 clean-up completed successfully."
+4. Clean up local script files:
+```bash
+rm -f primary_userdata.sh standby_userdata.sh
+```
+
+5. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 3.2 clean-up completed successfully."
 ```
 
 ---

@@ -85,6 +85,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch EC2 Instance with Primary ENI
+
+1. Discover VPC, subnets, and AMI:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -104,43 +106,63 @@ SUBNET_2=$(aws ec2 describe-subnets \
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
+2. Launch the EC2 instance in Subnet 1:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
   --subnet-id "${SUBNET_1}" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=dual-eni-host}]" \
   --query "Instances[0].InstanceId" --output text)
-
-echo "Waiting for instance ${INSTANCE_ID} to run..."
-aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
 
-### Step 2: Create and Attach Secondary ENI
+3. Confirm launched instance and wait until running:
 ```bash
-# Get Security Group
+echo "Waiting for instance ${INSTANCE_ID} to run..."
+aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
+echo "[SUCCESS] Instance ${INSTANCE_ID} is running."
+```
+
+---
+
+### Step 2: Create and Attach Secondary ENI
+
+1. Retrieve the instance Security Group:
+```bash
 SG_ID=$(aws ec2 describe-instances \
   --instance-ids "${INSTANCE_ID}" \
   --query "Reservations[0].Instances[0].SecurityGroups[0].GroupId" \
   --output text)
+```
 
-# Create secondary ENI in Subnet 2
+2. Create the secondary ENI in Subnet 2:
+```bash
 SECONDARY_ENI_ID=$(aws ec2 create-network-interface \
   --subnet-id "${SUBNET_2}" \
   --description "Secondary ENI for management traffic" \
   --groups "${SG_ID}" \
   --tag-specifications "ResourceType=network-interface,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=secondary-eni}]" \
   --query "NetworkInterface.NetworkInterfaceId" --output text)
+```
 
+3. Confirm created secondary ENI:
+```bash
 echo "Created Secondary ENI: ${SECONDARY_ENI_ID}"
+```
 
-# Attach ENI to Device Index 1 (eth1)
+4. Attach the secondary ENI at Device Index 1 (`eth1`):
+```bash
 ATTACHMENT_ID=$(aws ec2 attach-network-interface \
   --network-interface-id "${SECONDARY_ENI_ID}" \
   --instance-id "${INSTANCE_ID}" \
   --device-index 1 \
   --query "AttachmentId" --output text)
+```
 
+5. Confirm attachment:
+```bash
 echo "Attached ENI (Device Index 1): ${ATTACHMENT_ID}"
 ```
 
@@ -151,7 +173,6 @@ echo "Attached ENI (Device Index 1): ${ATTACHMENT_ID}"
 ### 1. Inspect Interfaces Inside the Guest OS
 Connect to the instance via Session Manager or SSH:
 ```bash
-# Inspect network links
 ip link show
 ```
 Notice both `eth0` and `eth1` are present, but `eth1` has no default route.
@@ -164,17 +185,20 @@ GATEWAY2=$(ip route | grep "default via" | awk '{print $3}' | sed 's/\.[0-9]*$/.
 
 ### 2. Configure Custom Routing Table for `eth1`
 Create table `100` and rule so all packets with source IP of `eth1` use table `100`:
+
+1. Add default route for `eth1` in table `100`:
 ```bash
-# Add default route for eth1 in table 100
 sudo ip route add default via ${GATEWAY2} dev eth1 table 100
+```
 
-# Add rule: any packet originating from IP2 must consult table 100
+2. Add policy routing rule:
+```bash
 sudo ip rule add from ${IP2} lookup 100
+```
 
-# Verify rule
+3. Verify active routing rules:
+```bash
 ip rule show
-# Output shows:
-# 32765: from 172.31.x.x lookup 100
 ```
 
 ### 3. Verify Ping / Curl Responses
@@ -184,23 +208,29 @@ Ping both interfaces from another host in the VPC or run test curl commands. Bot
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Detach secondary ENI:
 ```bash
-# 1. Detach secondary ENI
 aws ec2 detach-network-interface --attachment-id "${ATTACHMENT_ID}" --force
 sleep 5
+```
 
-# 2. Delete secondary ENI
+2. Delete secondary ENI:
+```bash
 aws ec2 delete-network-interface --network-interface-id "${SECONDARY_ENI_ID}"
+```
 
-# 3. Terminate instance
+3. Terminate instance and wait for termination:
+```bash
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
+```
 
-echo "Lab 3.1 clean-up completed successfully."
+4. Confirm cleanup:
+```bash
+echo "[SUCCESS] Lab 3.1 clean-up completed successfully."
 ```
 
 ---

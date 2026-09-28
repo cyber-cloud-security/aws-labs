@@ -3,9 +3,9 @@
 # 🐧 Ubuntu Linux: AWS CLI v2 & Environment Setup
 
 ![OS](https://img.shields.io/badge/🐧_OS-Ubuntu_22.04%2F24.04_LTS-E95420?style=flat-square)
-![Arch](https://img.shields.io/badge/⚙️_Arch-x86__64_%26_ARM64_(aarch64)-539bf5?style=flat-square)
-![CLI](https://img.shields.io/badge/💻_CLI-AWS_CLI_v2-f69d50?style=flat-square)
-![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
+![Arch](https://img.shields.io/badge/⚙️_Arch-x86__64_%26_ARM64_(aarch64)-38bdf8?style=flat-square)
+![CLI](https://img.shields.io/badge/💻_CLI-AWS_CLI_v2-50e3c2?style=flat-square)
+![Theme](https://img.shields.io/badge/🎨_Theme-Vercel_Geist_Minimalist-000000?style=flat-square)
 
 [⬅️ Back to Module 00 Hub](./README.md) &nbsp;•&nbsp; [🍎 macOS Setup Guide](./prerequisites-macos.md) &nbsp;•&nbsp; [🚀 Start Module 01](../module-01-fundamentals-and-lifecycle/README.md)
 

@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 07](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-25_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-07_%E2%80%94_Monitoring-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-25_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-07_%E2%80%94_Monitoring-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-07-monitoring-and-troubleshooting/lab-02-cloudwatch-agent-metrics-logs/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-07-monitoring-and-troubleshooting/lab-04-vpc-flow-logs/README.md)**
 
@@ -85,14 +85,17 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Part 1: Enable EC2 Serial Console (Account Level)
-The EC2 Serial Console is disabled account-wide by default:
+
+The EC2 Serial Console is disabled account-wide by default.
+
+1. Enable account-level serial console access in the current region:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
-
-# Enable account-level serial console access:
 aws ec2 enable-serial-console-access --region "${AWS_REGION}"
+```
 
-# Verify:
+2. Verify serial console access status:
+```bash
 aws ec2 get-serial-console-access-status --region "${AWS_REGION}"
 ```
 
@@ -100,10 +103,10 @@ aws ec2 get-serial-console-access-status --region "${AWS_REGION}"
 
 ### Part 2: The EBS Root Volume Rescue Workflow
 
-#### Step 1: Simulate Broken Node
-Assume instance `BROKEN_ID` with root volume `ROOT_VOL_ID` in Availability Zone `AZ`:
+#### Step 1: Query Broken Instance Details and Stop Instance
+
+1. Fetch instance AZ and root volume ID:
 ```bash
-# 1. Fetch instance details
 AZ=$(aws ec2 describe-instances \
   --instance-ids "${BROKEN_ID}" \
   --query "Reservations[0].Instances[0].Placement.AvailabilityZone" \
@@ -112,22 +115,35 @@ ROOT_VOL_ID=$(aws ec2 describe-instances \
   --instance-ids "${BROKEN_ID}" \
   --query "Reservations[0].Instances[0].BlockDeviceMappings[0].Ebs.VolumeId" \
   --output text)
+```
 
-echo "Target broken volume: ${ROOT_VOL_ID} in ${AZ}"
+2. Confirm target volume:
+```bash
+echo "[INFO] Target broken volume: ${ROOT_VOL_ID} in ${AZ}"
+```
 
-# 2. Stop the broken instance
+3. Stop the impaired instance:
+```bash
 aws ec2 stop-instances --instance-ids "${BROKEN_ID}"
 aws ec2 wait instance-stopped --instance-ids "${BROKEN_ID}"
 ```
 
 #### Step 2: Detach the Corrupt Root Volume
+
+1. Detach root volume:
 ```bash
 aws ec2 detach-volume --volume-id "${ROOT_VOL_ID}"
 aws ec2 wait volume-available --volume-ids "${ROOT_VOL_ID}"
-echo "Corrupt root volume detached."
+```
+
+2. Confirm detachment:
+```bash
+echo "[SUCCESS] Corrupt root volume detached."
 ```
 
 #### Step 3: Launch a Temporary Rescue Instance in the SAME AZ
+
+1. Query subnet ID and latest AMI:
 ```bash
 SUBNET_ID=$(aws ec2 describe-instances \
   --instance-ids "${BROKEN_ID}" \
@@ -137,82 +153,109 @@ AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" \
   --output text)
+```
 
+2. Launch rescue instance:
+```bash
 RESCUE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
   --subnet-id "${SUBNET_ID}" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=rescue-node}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
+3. Wait for rescue instance boot:
+```bash
 aws ec2 wait instance-running --instance-ids "${RESCUE_ID}"
-echo "Rescue node running: ${RESCUE_ID}"
+echo "[SUCCESS] Rescue node running: ${RESCUE_ID}"
 ```
 
 #### Step 4: Attach the Corrupt Volume to the Rescue Instance
-Attach as a secondary data volume (`/dev/sdf`):
+
+1. Attach volume as secondary disk (`/dev/sdf`):
 ```bash
 aws ec2 attach-volume \
   --volume-id "${ROOT_VOL_ID}" \
   --instance-id "${RESCUE_ID}" \
   --device "/dev/sdf"
+```
 
+2. Wait for attachment:
+```bash
 aws ec2 wait volume-in-use --volume-ids "${ROOT_VOL_ID}"
 ```
 
 #### Step 5: Repair Filesystem on Rescue Instance
-Log into `RESCUE_ID` via SSM Session Manager or SSH:
-```bash
-# 1. Identify attached drive (e.g. /dev/nvme1n1p1)
-lsblk
 
-# 2. Mount corrupt partition to a repair directory
+Log into `RESCUE_ID` via SSM Session Manager or SSH:
+
+1. Identify attached drive partition:
+```bash
+lsblk
+```
+
+2. Mount corrupt partition to a repair mountpoint:
+```bash
 sudo mkdir -p /mnt/rescue-root
 sudo mount -o nouuid /dev/nvme1n1p1 /mnt/rescue-root
+```
 
-# 3. Perform repair (e.g. comment out broken fstab entry or fix configuration)
+3. Comment out corrupt or broken mount entries in `/etc/fstab`:
+```bash
 sudo sed -i 's/^.*bad_mount.*$/# disabled bad mount/' /mnt/rescue-root/etc/fstab
+```
 
-# 4. Safely unmount
+4. Safely unmount repaired volume:
+```bash
 sudo umount /mnt/rescue-root
 ```
 
 #### Step 6: Detach from Rescue Node and Reattach to Production Node
+
+1. Detach repaired volume from rescue node:
 ```bash
-# 1. Detach from rescue node
 aws ec2 detach-volume --volume-id "${ROOT_VOL_ID}"
 aws ec2 wait volume-available --volume-ids "${ROOT_VOL_ID}"
+```
 
-# 2. Terminate temporary rescue instance
+2. Terminate temporary rescue instance:
+```bash
 aws ec2 terminate-instances --instance-ids "${RESCUE_ID}"
+```
 
-# 3. CRITICAL: Reattach to original instance as the ROOT device (/dev/xvda)
+3. Reattach volume to original instance as the root device (`/dev/xvda`):
+```bash
 aws ec2 attach-volume \
   --volume-id "${ROOT_VOL_ID}" \
   --instance-id "${BROKEN_ID}" \
   --device "/dev/xvda"
-
 aws ec2 wait volume-in-use --volume-ids "${ROOT_VOL_ID}"
+```
 
-# 4. Start the recovered instance!
+4. Start the recovered instance:
+```bash
 aws ec2 start-instances --instance-ids "${BROKEN_ID}"
 aws ec2 wait instance-running --instance-ids "${BROKEN_ID}"
-
-echo "Instance ${BROKEN_ID} successfully resurrected!"
+echo "[SUCCESS] Instance ${BROKEN_ID} successfully resurrected!"
 ```
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Terminate the recovered instance:
 ```bash
 aws ec2 terminate-instances --instance-ids "${BROKEN_ID}"
 aws ec2 wait instance-terminated --instance-ids "${BROKEN_ID}"
-echo "Lab 7.3 clean-up completed successfully."
+```
+
+2. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 7.3 clean-up completed successfully."
 ```
 
 ---

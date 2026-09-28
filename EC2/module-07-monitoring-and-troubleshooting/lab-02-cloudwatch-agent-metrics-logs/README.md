@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 07](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-07_%E2%80%94_Monitoring-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-07_%E2%80%94_Monitoring-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-07-monitoring-and-troubleshooting/lab-01-status-checks-autorecovery/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-07-monitoring-and-troubleshooting/lab-03-serial-console-ebs-rescue/README.md)**
 
@@ -86,6 +86,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create IAM Role with CloudWatch Agent Policy
+
+1. Query network parameters:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -96,8 +98,11 @@ export SUBNET_ID=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
   --query "Subnets[0].SubnetId" \
   --output text)
+```
 
-cat <<JSON > cw-trust.json
+2. Create assume role trust policy:
+```bash
+cat << 'JSON' > cw-trust.json
 {
   "Version": "2012-10-17",
   "Statement": [{
@@ -107,21 +112,28 @@ cat <<JSON > cw-trust.json
   }]
 }
 JSON
+```
 
+3. Create IAM role and attach CloudWatch Agent managed policy:
+```bash
 aws iam create-role --role-name "ec2-cw-agent-role" --assume-role-policy-document file://cw-trust.json 2>/dev/null || true
 aws iam attach-role-policy \
   --role-name "ec2-cw-agent-role" \
   --policy-arn "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+```
 
+4. Create instance profile and bind role:
+```bash
 aws iam create-instance-profile --instance-profile-name "ec2-cw-agent-profile" 2>/dev/null || true
 aws iam add-role-to-instance-profile --instance-profile-name "ec2-cw-agent-profile" --role-name "ec2-cw-agent-role" 2>/dev/null || true
-
 sleep 10
 ```
 
 ### Step 2: Store Agent Configuration in SSM Parameter Store
+
+1. Create CloudWatch Agent JSON configuration:
 ```bash
-cat <<'JSON' > cw-config.json
+cat << 'JSON' > cw-config.json
 {
   "metrics": {
     "metrics_collected": {
@@ -154,22 +166,33 @@ cat <<'JSON' > cw-config.json
   }
 }
 JSON
+```
 
+2. Push configuration into SSM Parameter Store:
+```bash
 aws ssm put-parameter \
   --name "AmazonCloudWatch-linux-ec2-labs" \
   --type "String" \
   --value file://cw-config.json \
   --overwrite
+```
 
-echo "Saved CloudWatch Agent configuration into SSM Parameter Store."
+3. Confirm configuration storage:
+```bash
+echo "[SUCCESS] Saved CloudWatch Agent configuration into SSM Parameter Store."
 ```
 
 ### Step 3: Launch Instance and Install Agent
+
+1. Query Amazon Linux 2023 AMI:
 ```bash
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
+2. Launch instance with bootstrap user data that fetches config from SSM:
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
@@ -184,10 +207,13 @@ dnf install -y amazon-cloudwatch-agent
   -c ssm:AmazonCloudWatch-linux-ec2-labs" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=cw-agent-node}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
-echo "Launched Node: ${INSTANCE_ID}"
+3. Wait for instance boot and initial metric batch:
+```bash
+echo "[SUCCESS] Launched Node: ${INSTANCE_ID}"
 aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
-echo "Waiting 60 seconds for agent to publish first metric batch..."
+echo "[INFO] Waiting 60 seconds for agent to publish first metric batch..."
 sleep 60
 ```
 
@@ -196,22 +222,13 @@ sleep 60
 ## 🔍 Verification & Telemetry
 
 ### 1. Check Custom OS Metrics in CloudWatch
-Query the `CWAgent` namespace:
+Query the `CWAgent` custom namespace:
 ```bash
 aws cloudwatch list-metrics \
   --namespace "CWAgent" \
   --dimensions "Name=InstanceId,Value=${INSTANCE_ID}" \
   --query "Metrics[*].MetricName" \
   --output table
-```
-**Expected Output**:
-```text
--------------------------
-|      ListMetrics      |
-+-----------------------+
-|  mem_used_percent     |
-|  disk_used_percent    |
-+-----------------------+
 ```
 
 ### 2. Verify Centralized Log Ingestion
@@ -223,25 +240,27 @@ aws logs filter-log-events \
   --query "events[*].message" \
   --output text
 ```
-You will see live system log entries streamed directly from `/var/log/messages` on your EC2 instance!
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Terminate instance:
 ```bash
-# 1. Terminate instance
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
+```
 
-# 2. Delete CloudWatch Log Group
+2. Delete CloudWatch Log Group:
+```bash
 aws logs delete-log-group --log-group-name "/aws/ec2/system-logs" 2>/dev/null || true
+```
 
-# 3. Clean up SSM parameter and IAM roles
+3. Clean up SSM parameter and IAM roles:
+```bash
 aws ssm delete-parameter --name "AmazonCloudWatch-linux-ec2-labs"
 aws iam remove-role-from-instance-profile \
   --instance-profile-name "ec2-cw-agent-profile" \
@@ -252,8 +271,11 @@ aws iam detach-role-policy \
   --policy-arn "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 aws iam delete-role --role-name "ec2-cw-agent-role"
 rm -f cw-trust.json cw-config.json
+```
 
-echo "Lab 7.2 clean-up completed successfully."
+4. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 7.2 clean-up completed successfully."
 ```
 
 ---

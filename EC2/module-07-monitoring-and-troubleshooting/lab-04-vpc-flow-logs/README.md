@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 07](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-07_%E2%80%94_Monitoring-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-20_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-07_%E2%80%94_Monitoring-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-07-monitoring-and-troubleshooting/lab-03-serial-console-ebs-rescue/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-08-advanced-nitro/lab-01-nitro-architecture/README.md)**
 
@@ -86,14 +86,19 @@ A standard flow log entry:
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Create IAM Role for Flow Logs Publishing
+
+1. Query network parameters:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
   --filters "Name=isDefault,Values=true" \
   --query "Vpcs[0].VpcId" \
   --output text)
+```
 
-cat <<JSON > flow-role-trust.json
+2. Create assume role trust policy for VPC Flow Logs:
+```bash
+cat << 'JSON' > flow-role-trust.json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -105,7 +110,10 @@ cat <<JSON > flow-role-trust.json
   ]
 }
 JSON
+```
 
+3. Create the IAM role:
+```bash
 FLOW_ROLE_ARN=$(aws iam create-role \
   --role-name "ec2-vpc-flow-logs-publisher" \
   --assume-role-policy-document file://flow-role-trust.json \
@@ -114,8 +122,11 @@ FLOW_ROLE_ARN=$(aws iam create-role \
     --role-name "ec2-vpc-flow-logs-publisher" \
     --query "Role.Arn" \
     --output text)
+```
 
-cat <<JSON > flow-policy.json
+4. Create flow policy document:
+```bash
+cat << 'JSON' > flow-policy.json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -133,7 +144,10 @@ cat <<JSON > flow-policy.json
   ]
 }
 JSON
+```
 
+5. Attach policy to the publisher role:
+```bash
 aws iam put-role-policy \
   --role-name "ec2-vpc-flow-logs-publisher" \
   --policy-name "VPCFlowLogsDelivery" \
@@ -141,11 +155,14 @@ aws iam put-role-policy \
 ```
 
 ### Step 2: Create CloudWatch Log Group & Enable Flow Logs
-```bash
-# 1. Create CloudWatch Log Group
-aws logs create-log-group --log-group-name "/aws/vpc/ec2-labs-flowlogs" 2>/dev/null || true
 
-# 2. Enable Flow Log on the VPC
+1. Create CloudWatch Log Group:
+```bash
+aws logs create-log-group --log-group-name "/aws/vpc/ec2-labs-flowlogs" 2>/dev/null || true
+```
+
+2. Enable Flow Logs on the VPC:
+```bash
 FLOW_LOG_ID=$(aws ec2 create-flow-logs \
   --resource-type "VPC" \
   --resource-ids "${VPC_ID}" \
@@ -154,8 +171,11 @@ FLOW_LOG_ID=$(aws ec2 create-flow-logs \
   --log-group-name "/aws/vpc/ec2-labs-flowlogs" \
   --deliver-logs-permission-arn "${FLOW_ROLE_ARN}" \
   --query "FlowLogIds[0]" --output text)
+```
 
-echo "Enabled Flow Log: ${FLOW_LOG_ID}"
+3. Confirm Flow Log creation:
+```bash
+echo "[SUCCESS] Enabled Flow Log: ${FLOW_LOG_ID}"
 ```
 
 ---
@@ -165,13 +185,13 @@ echo "Enabled Flow Log: ${FLOW_LOG_ID}"
 ### 1. Trigger Blocked Connection (Simulated Attack)
 Find any running EC2 public IP and send packets to closed port 22 or port 4444:
 ```bash
-# Test connection that gets dropped by Security Group:
 nc -z -v -w 2 <EC2_PUBLIC_IP> 22 || true
 ```
 
 ### 2. Query Flow Logs with CloudWatch Logs Insights
-Run this CloudWatch Insights query in the AWS Console or via AWS CLI to uncover dropped packets:
+Run this CloudWatch Insights query to uncover dropped packets:
 
+1. Initiate the query:
 ```bash
 QUERY_ID=$(aws logs start-query \
   --log-group-name "/aws/vpc/ec2-labs-flowlogs" \
@@ -183,39 +203,47 @@ QUERY_ID=$(aws logs start-query \
 | sort dropCount desc
 | limit 10' \
   --query "queryId" --output text)
-
-echo "Executed query ID: ${QUERY_ID}"
 ```
 
-Retrieve results:
+2. Confirm query execution:
+```bash
+echo "[SUCCESS] Executed query ID: ${QUERY_ID}"
+```
+
+3. Retrieve results:
 ```bash
 aws logs get-query-results --query-id "${QUERY_ID}"
 ```
-**Insight**: Shows exact source IP addresses attempting connections to rejected ports.
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Delete Flow Log:
 ```bash
-# 1. Delete Flow Log
 aws ec2 delete-flow-logs --flow-log-ids "${FLOW_LOG_ID}"
+```
 
-# 2. Delete Log Group
+2. Delete Log Group:
+```bash
 aws logs delete-log-group --log-group-name "/aws/vpc/ec2-labs-flowlogs" 2>/dev/null || true
+```
 
-# 3. Clean up IAM Role
+3. Delete IAM Role policies and role:
+```bash
 aws iam delete-role-policy \
   --role-name "ec2-vpc-flow-logs-publisher" \
   --policy-name "VPCFlowLogsDelivery"
 aws iam delete-role --role-name "ec2-vpc-flow-logs-publisher"
 rm -f flow-role-trust.json flow-policy.json
+```
 
-echo "Lab 7.4 clean-up completed successfully."
+4. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 7.4 clean-up completed successfully."
 ```
 
 ---

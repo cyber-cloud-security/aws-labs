@@ -4,7 +4,7 @@
 
 **[🏠 AWS Labs Root](../../../README.md)** &nbsp;•&nbsp; **[🖥️ EC2 Curriculum](../../README.md)** &nbsp;•&nbsp; **[📂 Module 07](../README.md)**
 
-![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-07_%E2%80%94_Monitoring-fd8c73?style=flat-square)
+![⏱️ Duration](https://img.shields.io/badge/%E2%8F%B1%EF%B8%8F_Duration-15_minutes-0969da?style=flat-square) ![💰 Cost](https://img.shields.io/badge/%F0%9F%92%B0_Cost-Free_Tier_Eligible-2da44e?style=flat-square) ![🎯 Level](https://img.shields.io/badge/%F0%9F%8E%AF_Level-Intermediate_to_Advanced-8250df?style=flat-square) ![📂 Module](https://img.shields.io/badge/%F0%9F%93%82_Module-07_%E2%80%94_Monitoring-fd8c73?style=flat-square) ![Theme](https://img.shields.io/badge/🎨_Theme-GitHub_Dark_Dimmed-22272e?style=flat-square)
 
 **[⬅️ Previous Lab](../../module-06-purchasing-cost-optimization/lab-03-cost-optimization-rightsizing/README.md)** &nbsp;|&nbsp; **[➡️ Next Lab](../../module-07-monitoring-and-troubleshooting/lab-02-cloudwatch-agent-metrics-logs/README.md)**
 
@@ -82,6 +82,8 @@ flowchart TD
 ## 🚀 Step-by-Step Instructions
 
 ### Step 1: Launch EC2 Instance with Detailed Monitoring
+
+1. Query network and AMI parameters:
 ```bash
 export AWS_REGION=$(aws configure get region || echo "us-east-1")
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -96,8 +98,10 @@ export SUBNET_ID=$(aws ec2 describe-subnets \
 AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
+```
 
-# Launch with Detailed Monitoring enabled (1-minute metrics):
+2. Launch instance with Detailed Monitoring enabled (1-minute metrics):
+```bash
 INSTANCE_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
@@ -105,13 +109,17 @@ INSTANCE_ID=$(aws ec2 run-instances \
   --monitoring "Enabled=true" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=auto-recovery-node}]" \
   --query "Instances[0].InstanceId" --output text)
+```
 
-echo "Launched instance with detailed monitoring: ${INSTANCE_ID}"
+3. Confirm launch and wait for running state:
+```bash
+echo "[SUCCESS] Launched instance with detailed monitoring: ${INSTANCE_ID}"
 aws ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 ```
 
 ### Step 2: Configure EC2 Auto-Recovery CloudWatch Alarm
-Create the alarm that triggers automated recovery when `StatusCheckFailed_System` fails for 2 consecutive minutes:
+
+1. Create CloudWatch metric alarm that triggers recovery on hardware failure:
 ```bash
 aws cloudwatch put-metric-alarm \
   --alarm-name "ec2-hardware-recovery-${INSTANCE_ID}" \
@@ -125,56 +133,54 @@ aws cloudwatch put-metric-alarm \
   --threshold 1 \
   --comparison-operator "GreaterThanOrEqualToThreshold" \
   --alarm-actions "arn:aws:automate:${AWS_REGION}:ec2:recover"
+```
 
-echo "Configured Auto-Recovery Alarm."
+2. Confirm alarm creation:
+```bash
+echo "[SUCCESS] Configured Auto-Recovery Alarm."
 ```
 
 ---
 
 ## 🔍 Verification & Telemetry
 
-Query the status check results:
+### 1. Check Status Check Results
 ```bash
 aws ec2 describe-instance-status \
   --instance-ids "${INSTANCE_ID}" \
   --query "InstanceStatuses[0].[InstanceId,SystemStatus.Status,InstanceStatus.Status]" \
   --output table
 ```
-**Expected Output**:
-```text
----------------------------------------------
-|           DescribeInstanceStatus          |
-+----------------------+---------+----------+
-|  i-0123456789abcdef0 |  ok     |  ok      |
-+----------------------+---------+----------+
-```
 
-Verify the alarm state:
+### 2. Verify Alarm State
 ```bash
 aws cloudwatch describe-alarms \
   --alarm-names "ec2-hardware-recovery-${INSTANCE_ID}" \
   --query "MetricAlarms[0].[AlarmName,StateValue,MetricName]" \
   --output table
 ```
-State displays `OK`.
 
 ---
 
 ## 🧹 Teardown & Clean-up
 
-
 > [!CAUTION]
 > **Always Tear Down Lab Resources**: Execute the cleanup commands below immediately after completing the verification steps to prevent unintended AWS billing.
 
+1. Delete CloudWatch Alarm:
 ```bash
-# 1. Delete CloudWatch Alarm
 aws cloudwatch delete-alarms --alarm-names "ec2-hardware-recovery-${INSTANCE_ID}"
+```
 
-# 2. Terminate instance
+2. Terminate EC2 instance:
+```bash
 aws ec2 terminate-instances --instance-ids "${INSTANCE_ID}"
 aws ec2 wait instance-terminated --instance-ids "${INSTANCE_ID}"
+```
 
-echo "Lab 7.1 clean-up completed successfully."
+3. Confirm clean-up completion:
+```bash
+echo "[SUCCESS] Lab 7.1 clean-up completed successfully."
 ```
 
 ---

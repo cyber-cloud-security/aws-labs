@@ -60,7 +60,7 @@ flowchart TD
     M --> P
     P --> C
     C --> V
-    V -->|✅ Passed| L
+    V -->|Passed| L
 ```
 
 ---

@@ -108,9 +108,9 @@ VPC_CHECK=$(aws ec2 describe-vpcs \
   --output text)
 
 if [ -n "$VPC_CHECK" ] && [ "$VPC_CHECK" != "None" ]; then
-  echo "✅ Pre-flight checks passed! Default VPC verified: ${VPC_CHECK}"
+  echo "[SUCCESS] Pre-flight checks passed! Default VPC verified: ${VPC_CHECK}"
 else
-  echo "⚠️ Warning: No default VPC found in us-east-1. Please ensure you have a VPC available before launching instances."
+  echo "[WARNING] No default VPC found in us-east-1. Please ensure you have a VPC available before launching instances."
 fi
 ```
 
@@ -127,7 +127,7 @@ aws-cli/2.x.x Python/3.x.x Darwin/...
 | 123456789012 | arn:aws:iam::123456789012:user/... | AIDA...      |
 +--------------+----------------------------------+--------------+
 === 3. Verifying EC2 Regional Connectivity (us-east-1) ===
-✅ Pre-flight checks passed! Default VPC verified: vpc-0a1b2c3d4e5f
+[SUCCESS] Pre-flight checks passed! Default VPC verified: vpc-0a1b2c3d4e5f
 ```
 
 ---

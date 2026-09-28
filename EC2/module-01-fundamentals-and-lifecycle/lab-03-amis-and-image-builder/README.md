@@ -75,119 +75,17 @@ flowchart TD
 
 ## ⏱️ Prerequisites & Environment Setup
 
-Before starting the lab, set up the **AWS CLI v2**, configure your IAM credentials, disable terminal paging, and run the pre-flight verification script for your operating system (**Ubuntu** or **macOS**).
+- **Global Setup**: Ensure you have completed the **[Module 00: Global Prerequisites & AWS CLI Environment Setup](../../module-00-prerequisites/README.md)** (AWS CLI v2 installed on Ubuntu/macOS, authenticated credentials, and `AWS_PAGER=""` configured).
+- **AWS Free Tier Eligible**: Yes (within 30 GB monthly EBS snapshot allocation).
+- **Estimated Duration**: 20 minutes.
+
+### 🔑 Lab-Specific Requirements
+> [!IMPORTANT]
+> - **Primary Region**: `us-east-1` (Active Default VPC with internet access).
+> - **Secondary Region**: `us-west-2` (Enabled region for cross-region AMI replication).
+> - **IAM Permissions**: `ec2:RunInstances`, `ec2:CreateImage`, `ec2:CopyImage`, `ec2:DeregisterImage`, `ec2:DeleteSnapshot`, and `ssm:GetParameter`.
 
 ---
-
-### Step 0.1: Install AWS CLI v2 & Required Tools
-
-<details open>
-<summary>🐧 <b>Ubuntu / Debian (Multipass, WSL2, Local, or Cloud Bastion)</b></summary>
-
-```bash
-# 1. Update package repository and install helper tools
-sudo apt update && sudo apt install -y curl unzip jq
-
-# 2. Download and install AWS CLI v2 (auto-detects x86_64 vs ARM64 / Apple Silicon VMs)
-ARCH=$(uname -m)
-if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-  curl -s "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
-else
-  curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-fi
-
-unzip -q awscliv2.zip
-sudo ./aws/install --update
-rm -rf aws awscliv2.zip
-```
-</details>
-
-<details>
-<summary>🍎 <b>macOS (Intel & Apple Silicon M1/M2/M3/M4)</b></summary>
-
-```bash
-# Option A: Install via Homebrew (Recommended)
-brew install awscli jq
-
-# Option B: Install via Official macOS PKG Installer
-curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
-sudo installer -pkg AWSCLIV2.pkg -target /
-rm -f AWSCLIV2.pkg
-```
-</details>
-
----
-
-### Step 0.2: Configure AWS Credentials & Environment Settings
-
-```bash
-# 1. Disable AWS CLI terminal paging (prevents hanging in automated or interactive sessions)
-export AWS_PAGER=""
-echo 'export AWS_PAGER=""' >> ~/.bashrc 2>/dev/null || true
-echo 'export AWS_PAGER=""' >> ~/.zshrc 2>/dev/null || true
-
-# 2. Configure your AWS credentials
-aws configure
-```
-
-When prompted, provide your IAM access details:
-- **AWS Access Key ID**: `YOUR_ACCESS_KEY_ID`
-- **AWS Secret Access Key**: `YOUR_SECRET_ACCESS_KEY`
-- **Default region name**: `us-east-1`
-- **Default output format**: `json`
-
-> [!TIP]
-> **Required IAM Permissions**: Ensure your IAM user or role has policies granting `ec2:*`, `ssm:GetParameter`, and `kms:CreateGrant` / `kms:Decrypt` (for cross-region encrypted AMI copy).
-
----
-
-### Step 0.3: Pre-Flight Verification Check
-
-Run this automated validation script in your terminal to verify that your AWS CLI, authentication, region connectivity, and Default VPC are functioning before executing Step 1:
-
-```bash
-echo "=== 1. Checking AWS CLI Version ==="
-aws --version
-
-echo "=== 2. Verifying Authenticated IAM Identity ==="
-aws sts get-caller-identity --output table
-
-echo "=== 3. Verifying EC2 API Connectivity (us-east-1) ==="
-VPC_CHECK=$(aws ec2 describe-vpcs \
-  --region us-east-1 \
-  --filters "Name=isDefault,Values=true" \
-  --query "Vpcs[0].VpcId" \
-  --output text)
-
-if [ -n "$VPC_CHECK" ] && [ "$VPC_CHECK" != "None" ]; then
-  echo "✅ Pre-flight checks passed! Default VPC found: ${VPC_CHECK}"
-else
-  echo "⚠️ Warning: No default VPC found in us-east-1. Ensure you create or specify a custom VPC and Subnet before proceeding."
-fi
-```
-
-#### Expected Pre-Flight Output:
-```text
-=== 1. Checking AWS CLI Version ===
-aws-cli/2.x.x Python/3.x.x Linux/Darwin...
-=== 2. Verifying Authenticated IAM Identity ===
-------------------------------------------------------------------
-|                       GetCallerIdentity                        |
-+--------------+----------------------------------+--------------+
-|   Account    |               Arn                |    UserId    |
-+--------------+----------------------------------+--------------+
-| 123456789012 | arn:aws:iam::123456789012:user/... | AIDA...      |
-+--------------+----------------------------------+--------------+
-=== 3. Verifying EC2 API Connectivity (us-east-1) ===
-✅ Pre-flight checks passed! Default VPC found: vpc-0a1b2c3d4e5f
-```
-
----
-
-> [!TIP]
-> **AWS Free Tier & Cost Guardrail**
-> - **AWS Free Tier Eligible**: Yes (within 30 GB monthly EBS snapshot allocation).
-> - **Estimated Duration**: 20 minutes.
 
 ---
 

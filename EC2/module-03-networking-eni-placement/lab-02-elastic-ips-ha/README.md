@@ -90,15 +90,27 @@ AMI_ID=$(aws ssm get-parameter \
   --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
   --query "Parameter.Value" --output text)
 
+# Create Primary and Standby bootstrap scripts
+cat << 'EOF' > primary_userdata.sh
+#!/bin/bash
+dnf install -y nginx
+echo '<h1>PRIMARY Active Node</h1>' > /usr/share/nginx/html/index.html
+systemctl start nginx
+EOF
+
+cat << 'EOF' > standby_userdata.sh
+#!/bin/bash
+dnf install -y nginx
+echo '<h1>STANDBY Failover Node</h1>' > /usr/share/nginx/html/index.html
+systemctl start nginx
+EOF
+
 # Launch Primary Node
 PRIMARY_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
   --subnet-id "${SUBNET_ID}" \
-  --user-data "#!/bin/bash
-dnf install -y nginx
-echo '<h1>PRIMARY Active Node</h1>' > /usr/share/nginx/html/index.html
-systemctl start nginx" \
+  --user-data file://primary_userdata.sh \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=ha-primary}]" \
   --query "Instances[0].InstanceId" --output text)
 
@@ -107,10 +119,7 @@ STANDBY_ID=$(aws ec2 run-instances \
   --image-id "${AMI_ID}" \
   --instance-type "t3.micro" \
   --subnet-id "${SUBNET_ID}" \
-  --user-data "#!/bin/bash
-dnf install -y nginx
-echo '<h1>STANDBY Failover Node</h1>' > /usr/share/nginx/html/index.html
-systemctl start nginx" \
+  --user-data file://standby_userdata.sh \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=ec2-master-labs},{Key=Name,Value=ha-standby}]" \
   --query "Instances[0].InstanceId" --output text)
 

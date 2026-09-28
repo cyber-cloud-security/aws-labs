@@ -92,7 +92,16 @@ flowchart TD
 
 ---
 
-## 📚 Complete 8-Module & 28-Lab Directory
+## 📚 Complete Curriculum Directory
+
+### ⚙️ [Module 00: Global Prerequisites & AWS CLI Environment Setup](./module-00-prerequisites/README.md)
+_One-time environment setup: Install AWS CLI v2 for **Ubuntu** and **macOS**, disable terminal pagination (`AWS_PAGER=""`), configure IAM credentials, run automated pre-flight health checks, and optionally launch a local Ubuntu 24.04 LTS VM with Multipass._
+
+| Guide | Description | Target Platforms |
+| :--- | :--- | :---: |
+| **[Global Prerequisites & AWS CLI Environment Setup](./module-00-prerequisites/README.md)** | Baseline AWS CLI v2, IAM auth, pager setup & pre-flight checks | 🐧 Ubuntu • 🍎 macOS |
+
+---
 
 ### 🧱 [Module 01: Foundations, Architectures & Lifecycle](./module-01-fundamentals-and-lifecycle/README.md)
 _Master EC2 processor architectures (x86_64 vs AWS Graviton ARM64), automated User Data bootstrapping, instance lifecycle state transitions, encrypted RAM hibernation, and immutable Golden AMI pipelines._
